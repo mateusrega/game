@@ -1,2 +1,5 @@
-#GAME
-Um jogo PWA com CSS respansivo
+# GAME
+
+---
+
+## Um jogo PWA com CSS respansivo
