@@ -1,264 +1,270 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Editor de Fase - CatTroll</title>
-<style>
-  body {
-    margin: 0;
-    background: #222;
-    color: #eee;
-    font-family: monospace;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CatTroll - Editor de Fase</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #222;
+      color: #eee;
+      font-family: monospace;
+    }
 
-  #editor {
-    margin: 10px;
-  }
+    #wrapper {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
 
-  #grid {
-    width: auto;
-    height: 90vh;
-    display: grid;
-    grid-template-columns: repeat(32, 16px);
-    grid-template-rows: repeat(18, 16px);
-    gap: 1px;
-    background: #111;
-    border: 2px solid #555;
-  }
+    #editor {
+      text-align: center;
+    }
 
-  .tile {
-    width: 16px;
-    height: 16px;
-    background: #444;
-    cursor: pointer;
-  }
+    #grid {
+      display: grid;
+      gap: 1px;
+      background: #111;
+      border: 2px solid #555;
+      width: 90vw;
+      max-width: 90vw;
+      margin: 10px auto;
+    }
 
-  .tile.platform {
-    background: #6a3;
-  }
+    .tile {
+      width: 16px;
+      height: 16px;
+      background: #444;
+      cursor: pointer;
+    }
 
-  .tile.goal {
-    background: #f55;
-  }
+    .tile.platform {
+      background: #6a3;
+    }
 
-  #game-canvas {
-    background: #222;
-    border: 2px solid #555;
-    display: none;
-  }
+    .tile.goal {
+      background: #f55;
+    }
 
-  button {
-    margin: 5px;
-    padding: 8px 16px;
-    font-weight: bold;
-    cursor: pointer;
-    border-radius: 5px;
-  }
-</style>
+    canvas {
+      display: none;
+      border: 2px solid #555;
+      background: #222;
+    }
+
+    button {
+      margin: 5px;
+      padding: 8px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+  </style>
 </head>
 <body>
 
-<h1>Editor de Fase + Jogo</h1>
-
-<div id="editor">
-  <div>
-    <button onclick="modo = 'plataforma'">Modo Plataforma</button>
-    <button onclick="modo = 'goal'">Modo Linha de Chegada</button>
+  <div id="wrapper">
+    <div id="editor">
+      <h1>Editor de Fase + Jogo</h1>
+      <div>
+        <button onclick="modo = 'plataforma'">Modo Plataforma</button>
+        <button onclick="modo = 'goal'">Modo Linha de Chegada</button>
+      </div>
+      <div id="grid"></div>
+      <button id="play-button">Jogar Fase</button>
+      <button id="edit-button" style="display:none;">Editar Fase</button>
+    </div>
+    <canvas id="game-canvas" width="512" height="288"></canvas>
   </div>
-  <div id="grid"></div>
-  <button id="play-button">Jogar Fase</button>
-  <button id="edit-button" style="display:none;">Editar Fase</button>
-</div>
 
-<canvas id="game-canvas" width="512" height="288"></canvas>
+  <script>
+    const TILE_SIZE = 16;
+    const COLS = Math.floor((window.innerWidth * 0.9) / TILE_SIZE);
+    const ROWS = Math.floor((window.innerHeight * 0.9) / TILE_SIZE);
 
-<script>
-  const COLS = 32;
-  const ROWS = 18;
-  let modo = 'plataforma';
+    let modo = 'plataforma';
+    let map = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+    const grid = document.getElementById('grid');
 
-  let map = Array(ROWS).fill().map(() => Array(COLS).fill(0));
-  const grid = document.getElementById('grid');
+    grid.style.gridTemplateColumns = `repeat(${COLS}, ${TILE_SIZE}px)`;
+    grid.style.gridTemplateRows = `repeat(${ROWS}, ${TILE_SIZE}px)`;
 
-  function criarGrid() {
-    grid.innerHTML = '';
-    for(let y = 0; y < ROWS; y++) {
-      for(let x = 0; x < COLS; x++) {
-        const div = document.createElement('div');
-        div.classList.add('tile');
-        if(map[y][x] === 1) div.classList.add('platform');
-        if(map[y][x] === 2) div.classList.add('goal');
-        div.dataset.x = x;
-        div.dataset.y = y;
-        div.addEventListener('click', () => {
-          if (modo === 'plataforma') {
-            map[y][x] = map[y][x] === 1 ? 0 : 1;
-          } else if (modo === 'goal') {
-            // Limpa qualquer outro bloco de chegada
-            for (let i = 0; i < ROWS; i++) {
-              for (let j = 0; j < COLS; j++) {
-                if (map[i][j] === 2) map[i][j] = 0;
+    function criarGrid() {
+      grid.innerHTML = '';
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const div = document.createElement('div');
+          div.classList.add('tile');
+          if (map[y][x] === 1) div.classList.add('platform');
+          if (map[y][x] === 2) div.classList.add('goal');
+          div.dataset.x = x;
+          div.dataset.y = y;
+          div.addEventListener('click', () => {
+            if (modo === 'plataforma') {
+              map[y][x] = map[y][x] === 1 ? 0 : 1;
+            } else if (modo === 'goal') {
+              for (let i = 0; i < ROWS; i++) {
+                for (let j = 0; j < COLS; j++) {
+                  if (map[i][j] === 2) map[i][j] = 0;
+                }
               }
+              map[y][x] = 2;
             }
-            map[y][x] = 2;
-          }
-          criarGrid();
-        });
-        grid.appendChild(div);
-      }
-    }
-  }
-
-  criarGrid();
-
-  const canvas = document.getElementById('game-canvas');
-  const ctx = canvas.getContext('2d');
-  let playing = false;
-
-  const player = {
-    x: 50,
-    y: 0,
-    width: 14,
-    height: 14,
-    vy: 0,
-    speed: 1.5,
-    jumpPower: 5,
-    onGround: false
-  };
-
-  const gravity = 0.25;
-
-  function desenharMapa() {
-    for(let y = 0; y < ROWS; y++) {
-      for(let x = 0; x < COLS; x++) {
-        if(map[y][x] === 1) {
-          ctx.fillStyle = '#6a3';
-          ctx.fillRect(x*16, y*16, 16, 16);
-        } else if (map[y][x] === 2) {
-          ctx.fillStyle = '#f55';
-          ctx.fillRect(x*16, y*16, 16, 16);
+            criarGrid();
+          });
+          grid.appendChild(div);
         }
       }
     }
-  }
 
-  function checarColisao(nx, ny) {
-    const left = Math.floor(nx / 16);
-    const right = Math.floor((nx + player.width) / 16);
-    const top = Math.floor(ny / 16);
-    const bottom = Math.floor((ny + player.height) / 16);
+    criarGrid();
 
-    if (
-      map[top]?.[left] === 1 ||
-      map[top]?.[right] === 1 ||
-      map[bottom]?.[left] === 1 ||
-      map[bottom]?.[right] === 1
-    ) {
-      return true;
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let playing = false;
+
+    const player = {
+      x: 50,
+      y: 0,
+      width: 14,
+      height: 14,
+      vy: 0,
+      speed: 1.5,
+      jumpPower: 5,
+      onGround: false
+    };
+
+    const gravity = 0.25;
+    const keys = { left: false, right: false };
+
+    function desenharMapa() {
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (map[y][x] === 1) {
+            ctx.fillStyle = '#6a3';
+            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          } else if (map[y][x] === 2) {
+            ctx.fillStyle = '#f55';
+            ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          }
+        }
+      }
     }
-    return false;
-  }
 
-  function verificarObjetivo() {
-    const cx = Math.floor((player.x + player.width / 2) / 16);
-    const cy = Math.floor((player.y + player.height / 2) / 16);
-    if (map[cy]?.[cx] === 2) {
-      alert('🎉 Você chegou à linha de chegada!');
+    function checarColisao(nx, ny) {
+      const left = Math.floor(nx / TILE_SIZE);
+      const right = Math.floor((nx + player.width) / TILE_SIZE);
+      const top = Math.floor(ny / TILE_SIZE);
+      const bottom = Math.floor((ny + player.height) / TILE_SIZE);
+      return (
+        map[top]?.[left] === 1 ||
+        map[top]?.[right] === 1 ||
+        map[bottom]?.[left] === 1 ||
+        map[bottom]?.[right] === 1
+      );
+    }
+
+    function verificarObjetivo() {
+      const cx = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+      const cy = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+      if (map[cy]?.[cx] === 2) {
+        alert('🎉 Você chegou à linha de chegada!');
+        playing = false;
+        mostrarEditor();
+      }
+    }
+
+    function atualizar() {
+      player.vy += gravity;
+      let ny = player.y + player.vy;
+
+      if (checarColisao(player.x, ny)) {
+        player.vy = 0;
+        player.onGround = true;
+        player.y = Math.floor((ny + player.height) / TILE_SIZE) * TILE_SIZE - player.height;
+      } else {
+        player.y = ny;
+        player.onGround = false;
+      }
+
+      if (keys.left) {
+        let nx = player.x - player.speed;
+        if (!checarColisao(nx, player.y)) player.x = nx;
+      }
+      if (keys.right) {
+        let nx = player.x + player.speed;
+        if (!checarColisao(nx, player.y)) player.x = nx;
+      }
+
+      verificarObjetivo();
+
+      // BORDAS MORTAIS
+      if (
+        player.x < -player.width ||
+        player.x > canvas.width ||
+        player.y > canvas.height ||
+        player.y < -player.height
+      ) {
+        alert('💀 Você caiu para fora da fase!');
+        playing = false;
+        mostrarEditor();
+      }
+    }
+
+    function desenhar() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      desenharMapa();
+      ctx.fillStyle = '#ff0';
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+    }
+
+    function gameLoop() {
+      atualizar();
+      desenhar();
+      if (playing) requestAnimationFrame(gameLoop);
+    }
+
+    function mostrarEditor() {
       playing = false;
-      mostrarEditor();
+      grid.style.display = 'grid';
+      document.getElementById('play-button').style.display = 'inline-block';
+      document.getElementById('edit-button').style.display = 'none';
+      canvas.style.display = 'none';
     }
-  }
 
-  function atualizar() {
-    player.vy += gravity;
-    let ny = player.y + player.vy;
+    window.addEventListener('keydown', e => {
+      if (e.code === 'ArrowLeft') keys.left = true;
+      if (e.code === 'ArrowRight') keys.right = true;
+      if (e.code === 'ArrowUp' && player.onGround) {
+        player.vy = -player.jumpPower;
+        player.onGround = false;
+      }
+    });
 
-    if (checarColisao(player.x, ny)) {
+    window.addEventListener('keyup', e => {
+      if (e.code === 'ArrowLeft') keys.left = false;
+      if (e.code === 'ArrowRight') keys.right = false;
+    });
+
+    document.getElementById('play-button').addEventListener('click', () => {
+      playing = true;
+      grid.style.display = 'none';
+      document.getElementById('play-button').style.display = 'none';
+      document.getElementById('edit-button').style.display = 'inline-block';
+      canvas.style.display = 'block';
+      player.x = 50;
+      player.y = 0;
       player.vy = 0;
-      player.onGround = true;
-      player.y = Math.floor((ny + player.height) / 16) * 16 - player.height;
-    } else {
-      player.y = ny;
-      player.onGround = false;
-    }
+      gameLoop();
+    });
 
-    if(keys.left) {
-      let nx = player.x - player.speed;
-      if(!checarColisao(nx, player.y)) player.x = nx;
-    }
-    if(keys.right) {
-      let nx = player.x + player.speed;
-      if(!checarColisao(nx, player.y)) player.x = nx;
-    }
-if (
-  player.x < -player.width ||
-  player.x > canvas.width ||
-  player.y > canvas.height ||
-  player.y < -player.height
-) {
-  alert('💀 Você caiu para fora da fase!');
-  playing = false;
-  mostrarEditor();
-}
-
-    verificarObjetivo();
-  }
-
-  function desenhar() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    desenharMapa();
-    ctx.fillStyle = '#ff0';
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-  }
-
-  const keys = { left: false, right: false };
-
-  window.addEventListener('keydown', e => {
-    if (e.code === 'ArrowLeft') keys.left = true;
-    if (e.code === 'ArrowRight') keys.right = true;
-    if (e.code === 'ArrowUp' && player.onGround) {
-      player.vy = -player.jumpPower;
-      player.onGround = false;
-    }
-  });
-
-  window.addEventListener('keyup', e => {
-    if (e.code === 'ArrowLeft') keys.left = false;
-    if (e.code === 'ArrowRight') keys.right = false;
-  });
-
-  function gameLoop() {
-    atualizar();
-    desenhar();
-    if (playing) requestAnimationFrame(gameLoop);
-  }
-
-  function mostrarEditor() {
-    playing = false;
-    document.getElementById('grid').style.display = 'grid';
-    document.getElementById('play-button').style.display = 'inline-block';
-    document.getElementById('edit-button').style.display = 'none';
-    canvas.style.display = 'none';
-  }
-
-  document.getElementById('play-button').addEventListener('click', () => {
-    playing = true;
-    document.getElementById('grid').style.display = 'none';
-    document.getElementById('play-button').style.display = 'none';
-    document.getElementById('edit-button').style.display = 'inline-block';
-    canvas.style.display = 'block';
-    player.x = 50;
-    player.y = 0;
-    player.vy = 0;
-    gameLoop();
-  });
-
-  document.getElementById('edit-button').addEventListener('click', mostrarEditor);
-</script>
-
+    document.getElementById('edit-button').addEventListener('click', mostrarEditor);
+  </script>
 </body>
 </html>
