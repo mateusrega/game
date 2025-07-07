@@ -1,1 +1,236 @@
-<!-- Coloque aqui o código atual do seu jogo (Cat Troll Game) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Editor e Jogo Básico</title>
+<style>
+  body {
+    margin: 0;
+    background: #222;
+    color: #eee;
+    font-family: monospace, monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #editor {
+    margin: 20px 0;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(16, 32px);
+    grid-template-rows: repeat(10, 32px);
+    gap: 2px;
+    background: #111;
+    border: 2px solid #555;
+  }
+
+  .tile {
+    width: 32px;
+    height: 32px;
+    background: #444;
+    cursor: pointer;
+  }
+
+  .tile.platform {
+    background: #6a3;
+  }
+
+  #game-canvas {
+    background: #222;
+    border: 2px solid #555;
+  }
+
+  button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Editor de Fase + Jogo</h1>
+
+<div id="editor">
+  <p>Clique nas células para alternar plataforma.</p>
+  <div id="grid"></div>
+  <button id="play-button">Jogar Fase</button>
+  <button id="edit-button" style="display:none;">Editar Fase</button>
+</div>
+
+<canvas id="game-canvas" width="512" height="320" style="display:none;"></canvas>
+
+<script>
+  const COLS = 16;
+  const ROWS = 10;
+
+  // Representa o mapa: 0 = vazio, 1 = plataforma
+  let map = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+
+  const grid = document.getElementById('grid');
+
+  // Criar grade do editor
+  function criarGrid() {
+    grid.innerHTML = '';
+    for(let y = 0; y < ROWS; y++) {
+      for(let x = 0; x < COLS; x++) {
+        const div = document.createElement('div');
+        div.classList.add('tile');
+        if(map[y][x] === 1) div.classList.add('platform');
+        div.dataset.x = x;
+        div.dataset.y = y;
+        div.addEventListener('click', () => {
+          map[y][x] = map[y][x] === 1 ? 0 : 1;
+          div.classList.toggle('platform');
+        });
+        grid.appendChild(div);
+      }
+    }
+  }
+
+  criarGrid();
+
+  // Game logic
+
+  const canvas = document.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+
+  let playing = false;
+
+  const player = {
+    x: 50,
+    y: 0,
+    width: 28,
+    height: 28,
+    vy: 0,
+    speed: 2.5,
+    jumpPower: 7,
+    onGround: false
+  };
+
+  const gravity = 0.3;
+
+  function desenharMapa() {
+    for(let y = 0; y < ROWS; y++) {
+      for(let x = 0; x < COLS; x++) {
+        if(map[y][x] === 1) {
+          ctx.fillStyle = '#6a3';
+          ctx.fillRect(x*32, y*32, 32, 32);
+        }
+      }
+    }
+  }
+
+  function checarColisao(nx, ny) {
+    // Verifica se nas posições de canto do jogador há plataforma
+    const left = Math.floor(nx / 32);
+    const right = Math.floor((nx + player.width) / 32);
+    const top = Math.floor(ny / 32);
+    const bottom = Math.floor((ny + player.height) / 32);
+
+    // Se algum tile nas posições está ocupado, colisão ocorre
+    if (
+      map[top][left] === 1 ||
+      map[top][right] === 1 ||
+      map[bottom][left] === 1 ||
+      map[bottom][right] === 1
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function atualizar() {
+    // Gravidade
+    player.vy += gravity;
+    let ny = player.y + player.vy;
+
+    // Colisão vertical
+    if (checarColisao(player.x, ny)) {
+      // No chão
+      player.vy = 0;
+      player.onGround = true;
+      // Ajusta Y para não ficar dentro do bloco
+      player.y = Math.floor((ny + player.height) / 32) * 32 - player.height;
+    } else {
+      player.y = ny;
+      player.onGround = false;
+    }
+
+    // Movimento horizontal
+    if(keys.left) {
+      let nx = player.x - player.speed;
+      if(!checarColisao(nx, player.y)) player.x = nx;
+    } else if(keys.right) {
+      let nx = player.x + player.speed;
+      if(!checarColisao(nx, player.y)) player.x = nx;
+    }
+  }
+
+  function desenhar() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    desenharMapa();
+
+    // Desenhar jogador
+    ctx.fillStyle = '#ff0';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
+
+  let keys = { left:false, right:false, up:false };
+
+  window.addEventListener('keydown', e => {
+    if(e.code === 'ArrowLeft') keys.left = true;
+    if(e.code === 'ArrowRight') keys.right = true;
+    if(e.code === 'ArrowUp') {
+      if(player.onGround) {
+        player.vy = -player.jumpPower;
+        player.onGround = false;
+      }
+    }
+  });
+
+  window.addEventListener('keyup', e => {
+    if(e.code === 'ArrowLeft') keys.left = false;
+    if(e.code === 'ArrowRight') keys.right = false;
+  });
+
+  // Loop do jogo
+  function gameLoop() {
+    atualizar();
+    desenhar();
+    if(playing) requestAnimationFrame(gameLoop);
+  }
+
+  // Botões
+  const playBtn = document.getElementById('play-button');
+  const editBtn = document.getElementById('edit-button');
+
+  playBtn.addEventListener('click', () => {
+    playing = true;
+    grid.style.display = 'none';
+    playBtn.style.display = 'none';
+    editBtn.style.display = 'inline-block';
+    canvas.style.display = 'block';
+    player.x = 50;
+    player.y = 0;
+    player.vy = 0;
+    gameLoop();
+  });
+
+  editBtn.addEventListener('click', () => {
+    playing = false;
+    grid.style.display = 'grid';
+    playBtn.style.display = 'inline-block';
+    editBtn.style.display = 'none';
+    canvas.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>
