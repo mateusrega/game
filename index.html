@@ -10,11 +10,21 @@
   <link rel="stylesheet" href="site.css" />
 
   <script>
-    // Se estiver no app instalado, vai direto pro jogo
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+  function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  }
+
+  if (isStandalone()) {
+    window.location.href = 'game.html';
+  }
+
+  // Para o caso de abrir a página e o modo standalone só ser detectado depois
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && isStandalone()) {
       window.location.href = 'game.html';
     }
-  </script>
+  });
+</script>
 </head>
 <body>
   <div class="container">
