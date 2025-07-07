@@ -2,7 +2,7 @@
   "name": "CatTroll",
   "short_name": "CatTroll",
   "description": "Um jogoque você vai gostar!",
-  "start_url": "index.html",
+  "start_url": "game.html",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
