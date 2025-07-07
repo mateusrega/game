@@ -18,7 +18,6 @@
     window.location.href = 'game.html';
   }
 
-  // Para o caso de abrir a página e o modo standalone só ser detectado depois
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && isStandalone()) {
       window.location.href = 'game.html';
