@@ -1,9 +1,8 @@
-
 {
-  "name": "Meu Jogo PWA",
-  "short_name": "MeuJogo",
-  "description": "Um jogo incrível para você se divertir!",
-  "start_url": "/",
+  "name": "CatTroll",
+  "short_name": "CatTroll",
+  "description": "Um jogoque você vai gostar!",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
