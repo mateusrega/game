@@ -18,7 +18,7 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     width: 100%;
     max-width: 420px;
-    text-align: center; /* garante centralização dos elementos inline */
+    text-align: center;
 }
 
 h1 {
@@ -37,14 +37,12 @@ p {
     color: #1a1a2e;
     border: none;
     padding: 15px 30px;
-    margin-top: 20px;
     font-size: 1.2em;
     font-weight: bold;
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
-    display: inline-block; /* para respeitar tamanho do conteúdo e permitir centralização */
-    /* removido width e max-width para botão do tamanho do texto */
+    display: inline-block;
 }
 
 #main-action-button:hover {
