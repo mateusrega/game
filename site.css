@@ -36,6 +36,7 @@ p { font-size: 1.1em; line-height: 1.6; margin-bottom: 30px; }
     width: 100%;
     max-width: 100%;
     display: none;
+    text-align: CENTER;
 }
 #main-action-button:hover {
     background-color: #40c265;
