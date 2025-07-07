@@ -1,6 +1,6 @@
 const CACHE_NAME = 'meu-jogo-pwa-cache-v2';
 const urlsToCache = [
-  '/site.html',
+  '/index.html',
   '/site.css',
   '/site.js',
   '/game.html',
