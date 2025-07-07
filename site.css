@@ -18,30 +18,40 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     width: 100%;
     max-width: 420px;
+    text-align: center; /* garante centralização dos elementos inline */
 }
-h1 { color: #8be9fd; margin-bottom: 20px; }
-p { font-size: 1.1em; line-height: 1.6; margin-bottom: 30px; }
-   
+
+h1 {
+    color: #8be9fd;
+    margin-bottom: 20px;
+}
+
+p {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
 #main-action-button {
     background-color: #50fa7b;
     color: #1a1a2e;
     border: none;
-    padding: 15px 30px; 
+    padding: 15px 30px;
     margin-top: 20px;
     font-size: 1.2em;
     font-weight: bold;
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
-    width: 100%;
-    max-width: 100%;
-    display: none;
-    text-align: CENTER;
+    display: inline-block; /* para respeitar tamanho do conteúdo e permitir centralização */
+    /* removido width e max-width para botão do tamanho do texto */
 }
+
 #main-action-button:hover {
     background-color: #40c265;
     transform: translateY(-2px);
 }
+
 #main-action-button:active {
     transform: translateY(0);
 }
