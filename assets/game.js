@@ -1,1 +1,0 @@
-// JS do jogo (adicione sua lógica aqui)
