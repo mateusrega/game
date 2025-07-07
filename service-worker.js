@@ -1,13 +1,13 @@
-
-const CACHE_NAME = 'meu-jogo-pwa-cache-v1';
+const CACHE_NAME = 'meu-jogo-pwa-cache-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/script.js',
+  '/site.html',
+  '/site.css',
+  '/site.js',
+  '/game.html',
+  '/game.css',
+  '/game.js',
   '/manifest.json',
   '/service-worker.js',
-  '/game.html',
   '/assets/icon-192.png',
   '/assets/icon-512.png'
 ];
