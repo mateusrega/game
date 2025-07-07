@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meu-jogo-pwa-cache-v2';
+const CACHE_NAME = 'cache-do-cat-troll';
 const urlsToCache = [
   '/index.html',
   '/site.css',
