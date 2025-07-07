@@ -8,6 +8,11 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="stylesheet" href="site.css">
+  <script>
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    window.location.href = 'game.html'; // já instalado? vai direto pro jogo
+  }
+</script>
 </head>
 <body>
   <div class="container">
