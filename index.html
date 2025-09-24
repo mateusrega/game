@@ -8,28 +8,12 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#1a1a2e" />
   <link rel="stylesheet" href="site.css" />
-
-  <script>
-  function isStandalone() {
-    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  }
-
-  if (isStandalone()) {
-    window.location.href = 'game.html';
-  }
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && isStandalone()) {
-      window.location.href = 'game.html';
-    }
-  });
-</script>
 </head>
 <body>
   <div class="container">
     <h1>CatTroll</h1>
     <p id="message-text">Carregando...</p>
-    <button id="main-action-button" style="display: none;"></button>
+    <button id="main-action-button" style="display: none;">Começar Jogo</button>
   </div>
 
   <script src="site.js"></script>
@@ -41,6 +25,8 @@
           .catch(err => console.log('Erro ao registrar SW:', err));
       });
     }
+
+    document.getElementById('main-action-button').style.display = 'block';
   </script>
 </body>
 </html>
