@@ -48,6 +48,7 @@ button.active{
   display:grid;
   background:#000;
   border:2px solid #444;
+  touch-action:none;
 }
 
 .tile{
@@ -109,21 +110,24 @@ canvas{
 </div>
 
 <script>
-/* ===== EDITOR ===== */
+/* ===== CONFIG ===== */
 const TILE = 16;
 const COLS = Math.floor(innerWidth*0.9 / TILE);
 const ROWS = Math.floor(innerHeight*0.6 / TILE);
 
+/* ===== ELEMENTOS ===== */
 const editor = document.getElementById("editor");
 const jogo = document.getElementById("jogo");
 const grid = document.getElementById("grid");
 
 grid.style.gridTemplateColumns = `repeat(${COLS}, ${TILE}px)`;
 
+/* ===== MAPA ===== */
 let map = Array.from({length:ROWS},()=>Array(COLS).fill(0));
 let modo = "plataforma";
 let pintando = false;
 
+/* ===== BOTÕES ===== */
 const bPlat = document.getElementById("bPlat");
 const bSpawn = document.getElementById("bSpawn");
 const bGoal = document.getElementById("bGoal");
@@ -138,6 +142,7 @@ function setModo(m){
 }
 setModo("plataforma");
 
+/* ===== EDITOR ===== */
 function limpar(valor){
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++)
@@ -148,7 +153,6 @@ function pintar(x,y){
   if(modo==="plataforma") map[y][x]=1;
   if(modo==="spawn"){ limpar(3); map[y][x]=3; }
   if(modo==="goal"){ limpar(2); map[y][x]=2; }
-  render();
 }
 
 function render(){
@@ -161,13 +165,47 @@ function render(){
       if(map[y][x]==2)d.classList.add("goal");
       if(map[y][x]==3)d.classList.add("spawn");
 
-      d.onpointerdown=()=>{pintar(x,y); pintando=true;}
-      d.onpointerenter=()=>{if(pintando)pintar(x,y);}
+      /* mouse */
+      d.addEventListener("mousedown",()=>{
+        pintando=true;
+        pintar(x,y);
+        render();
+      });
+      d.addEventListener("mouseenter",()=>{
+        if(pintando){
+          pintar(x,y);
+          render();
+        }
+      });
+
+      /* touch */
+      d.addEventListener("touchstart",e=>{
+        e.preventDefault();
+        pintando=true;
+        pintar(x,y);
+        render();
+      });
+      d.addEventListener("touchmove",e=>{
+        e.preventDefault();
+        const t = e.touches[0];
+        const el = document.elementFromPoint(t.clientX,t.clientY);
+        if(el && el.classList.contains("tile")){
+          const i = [...grid.children].indexOf(el);
+          const yy = Math.floor(i / COLS);
+          const xx = i % COLS;
+          pintar(xx,yy);
+          render();
+        }
+      });
+
       grid.appendChild(d);
     }
   }
 }
-window.onpointerup=()=>pintando=false;
+
+document.addEventListener("mouseup",()=>pintando=false);
+document.addEventListener("touchend",()=>pintando=false);
+
 render();
 
 /* ===== JOGO ===== */
@@ -175,18 +213,12 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = true;
 
-const player={
-  x:0,y:0,
-  w:20,h:20,
-  vx:0,vy:0,
-  onGround:false
-};
-
+const player={x:0,y:0,w:20,h:20,vx:0,vy:0,onGround:false};
 const gravity=0.4;
 let keys={l:false,r:false};
-let joyX = 0;
+let joyX=0;
 
-const img = new Image();
+const img=new Image();
 img.src="assets/icon-512.png";
 
 function achar(v){
@@ -214,8 +246,8 @@ function update(){
     player.onGround=true;
   }
 
-  const inputX = (keys.l?-1:0) + (keys.r?1:0) + joyX;
-  player.vx = Math.max(-1,Math.min(1,inputX)) * 2.5;
+  const inputX=(keys.l?-1:0)+(keys.r?1:0)+joyX;
+  player.vx=Math.max(-1,Math.min(1,inputX))*2.5;
 
   if(!colisao(player.x+player.vx,player.y))
     player.x+=player.vx;
@@ -230,7 +262,6 @@ function update(){
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++){
       if(map[y][x]==1){
@@ -241,16 +272,8 @@ function draw(){
         ctx.fillStyle="#e53935";
         ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
       }
-      /* spawn NÃO desenha no jogo */
     }
-
-  ctx.drawImage(
-    img,
-    player.x-2,
-    player.y-2,
-    player.w+4,
-    player.h+4
-  );
+  ctx.drawImage(img,player.x-2,player.y-2,player.w+4,player.h+4);
 }
 
 function loop(){ update(); draw(); requestAnimationFrame(loop); }
@@ -264,7 +287,6 @@ function mostrarJogo(){
   editor.style.display="none";
   jogo.style.display="flex";
   joystick.style.display="block";
-
   player.x=s.x*TILE;
   player.y=s.y*TILE;
   player.vy=0;
@@ -276,33 +298,36 @@ function mostrarEditor(){
   joystick.style.display="none";
 }
 
+bPlat.onclick=()=>setModo("plataforma");
+bSpawn.onclick=()=>setModo("spawn");
+bGoal.onclick=()=>setModo("goal");
+bTest.onclick=mostrarJogo;
+
 /* teclado */
 onkeydown=e=>{
   if(e.key==="ArrowLeft")keys.l=true;
   if(e.key==="ArrowRight")keys.r=true;
   if(e.key==="ArrowUp"&&player.onGround)player.vy=-8;
-}
+};
 onkeyup=e=>{
   if(e.key==="ArrowLeft")keys.l=false;
   if(e.key==="ArrowRight")keys.r=false;
 };
 
-/* ===== JOYSTICK ANALÓGICO ===== */
+/* joystick */
 const joystick=document.getElementById("joystick");
 const stick=document.getElementById("stick");
 
-joystick.onpointermove=e=>{
-  if(e.buttons){
-    const rect=joystick.getBoundingClientRect();
-    const dx=e.clientX-(rect.left+60);
-    joyX=Math.max(-1,Math.min(1,dx/40));
-    stick.style.left=60+dx-25+"px";
-  }
-};
-joystick.onpointerup=()=>{
+joystick.addEventListener("touchmove",e=>{
+  const rect=joystick.getBoundingClientRect();
+  const dx=e.touches[0].clientX-(rect.left+60);
+  joyX=Math.max(-1,Math.min(1,dx/40));
+  stick.style.left=60+dx-25+"px";
+});
+joystick.addEventListener("touchend",()=>{
   joyX=0;
   stick.style.left="35px";
-};
+});
 </script>
 
 </body>
