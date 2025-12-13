@@ -25,6 +25,7 @@ button{
 }
 
 button:hover{ background:#555; }
+button.active{ background:#2196f3; }
 
 #editor,#jogo{
   display:none;
@@ -65,6 +66,7 @@ canvas{
   border:2px solid #444;
 }
 
+/* overlays */
 .overlay{
   position:absolute;
   inset:0;
@@ -76,6 +78,9 @@ canvas{
   gap:12px;
 }
 
+.overlay h2{ margin:0; }
+
+/* joystick */
 #joystick{
   position:fixed;
   bottom:20px;
@@ -96,6 +101,7 @@ canvas{
   top:35px;
 }
 
+/* botão pulo */
 #jumpBtn{
   position:fixed;
   bottom:30px;
@@ -105,17 +111,6 @@ canvas{
   border-radius:50%;
   background:#2196f3;
   display:none;
-}
-
-/* versão discreta */
-#versionTag{
-  position:fixed;
-  bottom:4px;
-  right:6px;
-  font-size:10px;
-  opacity:.25;
-  color:#aaa;
-  pointer-events:none;
 }
 </style>
 </head>
@@ -141,50 +136,22 @@ canvas{
       <h2>🎉 Você Ganhou!</h2>
       <button onclick="mostrarJogo()">Rejogar</button>
       <button onclick="mostrarEditor()">Editor</button>
+      <button onclick="mostrarEditor()">Menu</button>
     </div>
 
     <div id="overlayLose" class="overlay" style="display:none">
       <h2>💀 Você Morreu</h2>
       <button onclick="mostrarJogo()">Rejogar</button>
       <button onclick="mostrarEditor()">Editor</button>
+      <button onclick="mostrarEditor()">Menu</button>
     </div>
   </div>
 </div>
 
 <div id="joystick"><div id="stick"></div></div>
 <button id="jumpBtn">⬆</button>
-<div id="versionTag"></div>
 
 <script>
-/* ===== VERSIONAMENTO ===== */
-let VERSION="0.017";
-const versionTag=document.getElementById("versionTag");
-versionTag.textContent="v"+VERSION;
-
-let versionHistory=JSON.parse(localStorage.getItem("CatTroll_versions")||"{}");
-
-function salvarVersao(){
-  if(versionHistory[VERSION])return;
-  versionHistory[VERSION]={
-    map:JSON.parse(JSON.stringify(map)),
-    data:Date.now()
-  };
-  localStorage.setItem("CatTroll_versions",JSON.stringify(versionHistory));
-}
-
-function restaurarVersao(v){
-  if(!versionHistory[v])return alert("Versão não encontrada");
-  map=JSON.parse(JSON.stringify(versionHistory[v].map));
-  render();
-}
-
-onkeydown=e=>{
-  if(e.ctrlKey&&e.shiftKey&&e.key==="R"){
-    const v=prompt("Restaurar versão:");
-    if(v)restaurarVersao(v);
-  }
-};
-
 /* ===== CONFIG ===== */
 const TILE=16;
 const COLS=Math.floor(innerWidth*0.9/TILE);
@@ -192,8 +159,6 @@ const ROWS=Math.floor(innerHeight*0.6/TILE);
 
 /* ===== MAPA ===== */
 let map=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-salvarVersao();
-
 let modo="plataforma";
 let pintando=false;
 
@@ -201,37 +166,52 @@ let pintando=false;
 const grid=document.getElementById("grid");
 grid.style.gridTemplateColumns=`repeat(${COLS},${TILE}px)`;
 
-function setModo(m){modo=m;}
+function setModo(m){ modo=m; }
 
 function limpar(v){
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++)
-      if(map[y][x]===v)map[y][x]=0;
+      if(map[y][x]===v) map[y][x]=0;
 }
 
 function pintar(x,y){
-  if(modo==="plataforma")map[y][x]=1;
-  if(modo==="spawn"){limpar(3);map[y][x]=3;}
-  if(modo==="goal"){limpar(2);map[y][x]=2;}
-  if(modo==="delete")map[y][x]=0;
-  salvarVersao();
+  if(modo==="plataforma") map[y][x]=1;
+  if(modo==="spawn"){ limpar(3); map[y][x]=3; }
+  if(modo==="goal"){ limpar(2); map[y][x]=2; }
+  if(modo==="delete") map[y][x]=0;
 }
 
 function render(){
   grid.innerHTML="";
-  for(let y=0;y<ROWS;y++)
+  for(let y=0;y<ROWS;y++){
     for(let x=0;x<COLS;x++){
       const d=document.createElement("div");
       d.className="tile";
       if(map[y][x]==1)d.classList.add("platform");
       if(map[y][x]==2)d.classList.add("goal");
       if(map[y][x]==3)d.classList.add("spawn");
+
       d.onmousedown=()=>{pintando=true;pintar(x,y);render();}
       d.onmouseenter=()=>{if(pintando){pintar(x,y);render();}}
+
+      d.ontouchstart=e=>{e.preventDefault();pintando=true;pintar(x,y);render();}
+      d.ontouchmove=e=>{
+        e.preventDefault();
+        const t=e.touches[0];
+        const el=document.elementFromPoint(t.clientX,t.clientY);
+        if(el?.classList.contains("tile")){
+          const i=[...grid.children].indexOf(el);
+          pintar(i%COLS,Math.floor(i/COLS));
+          render();
+        }
+      };
+
       grid.appendChild(d);
     }
+  }
 }
 onmouseup=()=>pintando=false;
+ontouchend=()=>pintando=false;
 render();
 
 /* ===== JOGO ===== */
@@ -239,9 +219,10 @@ const canvas=document.getElementById("canvas");
 const ctx=canvas.getContext("2d");
 
 const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
-const gravity=.45;
+const gravity=0.45;
 
 let keys={l:false,r:false};
+let joyX=0;
 let estado="jogo";
 
 const win=document.getElementById("overlayWin");
@@ -251,18 +232,33 @@ function achar(v){
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++)
       if(map[y][x]===v)return{x,y};
+  return null;
 }
 
 function colisao(nx,ny){
   const l=Math.floor(nx/TILE);
-  const r=Math.floor((nx+15)/TILE);
+  const r=Math.floor((nx+player.w-1)/TILE);
   const t=Math.floor(ny/TILE);
-  const b=Math.floor((ny+15)/TILE);
+  const b=Math.floor((ny+player.h-1)/TILE);
   return map[t]?.[l]==1||map[t]?.[r]==1||map[b]?.[l]==1||map[b]?.[r]==1;
 }
 
+/* EXPULSÃO DE PLATAFORMA */
+function expulsar(){
+  if(!colisao(player.x,player.y)) return;
+  for(let i=0;i<10;i++){
+    if(!colisao(player.x,player.y-1)){ player.y--; return; }
+    if(!colisao(player.x-1,player.y)){ player.x--; return; }
+    if(!colisao(player.x+1,player.y)){ player.x++; return; }
+    player.y--;
+  }
+}
+
 function update(){
-  if(estado!=="jogo")return;
+  if(estado!=="jogo") return;
+
+  expulsar();
+
   player.vy+=gravity;
   if(!colisao(player.x,player.y+player.vy)){
     player.y+=player.vy;
@@ -271,45 +267,78 @@ function update(){
     player.vy=0;
     player.onGround=true;
   }
-  player.vx=(keys.l?-1:0)+(keys.r?1:0);
-  player.vx=Math.max(-1,Math.min(1,player.vx))*2.5;
-  if(!colisao(player.x+player.vx,player.y))player.x+=player.vx;
-  if(player.y>canvas.height){estado="lose";lose.style.display="flex";}
+
+  player.vx=(keys.l?-1:0)+(keys.r?1:0)+joyX;
+  player.vx=Math.max(-1,Math.min(1,player.vx))*2.6;
+  if(!colisao(player.x+player.vx,player.y)) player.x+=player.vx;
+
+  if(player.y>canvas.height){ estado="lose"; lose.style.display="flex"; }
+
   const cx=Math.floor((player.x+8)/TILE);
   const cy=Math.floor((player.y+8)/TILE);
-  if(map[cy]?.[cx]==2){estado="win";win.style.display="flex";}
+  if(map[cy]?.[cx]==2){ estado="win"; win.style.display="flex"; }
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   for(let y=0;y<ROWS;y++)
-    for(let x=0;x<COLS;x++)
-      if(map[y][x]==1){
-        ctx.fillStyle="#4caf50";
-        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
-      }
+    for(let x=0;x<COLS;x++){
+      if(map[y][x]==1){ctx.fillStyle="#4caf50";ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}
+      if(map[y][x]==2){ctx.fillStyle="#e53935";ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}
+    }
   ctx.fillStyle="#ff0";
-  ctx.fillRect(player.x,player.y,16,16);
+  ctx.fillRect(player.x,player.y,player.w,player.h);
 }
 
 function loop(){update();draw();requestAnimationFrame(loop);}
 
 function mostrarJogo(){
-  const s=achar(3),g=achar(2);
-  if(!s||!g)return alert("Spawn e Chegada obrigatórios");
-  editor.style.display="none";
-  jogo.style.display="flex";
+  const s=achar(3), g=achar(2);
+  if(!s||!g) return alert("Spawn e Chegada obrigatórios");
+
+  document.getElementById("editor").style.display="none";
+  document.getElementById("jogo").style.display="flex";
+  joystick.style.display="block";
+  jumpBtn.style.display="block";
+  win.style.display=lose.style.display="none";
+
   player.x=s.x*TILE;
   player.y=s.y*TILE-1;
+  player.vy=0;
   estado="jogo";
   loop();
 }
-
 function mostrarEditor(){
-  jogo.style.display="none";
-  editor.style.display="flex";
+  document.getElementById("jogo").style.display="none";
+  document.getElementById("editor").style.display="flex";
+  joystick.style.display=jumpBtn.style.display="none";
 }
+
+/* CONTROLES */
+onkeydown=e=>{
+  if(e.key==="ArrowLeft")keys.l=true;
+  if(e.key==="ArrowRight")keys.r=true;
+  if((e.key==="ArrowUp"||e.key===" ")&&player.onGround){
+    player.vy=-8;
+  }
+};
+onkeyup=e=>{
+  if(e.key==="ArrowLeft")keys.l=false;
+  if(e.key==="ArrowRight")keys.r=false;
+};
+
+/* joystick */
+const joystick=document.getElementById("joystick");
+joystick.addEventListener("touchmove",e=>{
+  const r=joystick.getBoundingClientRect();
+  joyX=Math.max(-1,Math.min(1,(e.touches[0].clientX-(r.left+60))/40));
+});
+joystick.addEventListener("touchend",()=>joyX=0);
+
+/* botão pulo */
+const jumpBtn=document.getElementById("jumpBtn");
+jumpBtn.ontouchstart=()=>{ if(player.onGround) player.vy=-8; };
 </script>
 
 </body>
-  </html>
+</html>
