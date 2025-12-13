@@ -6,38 +6,28 @@
 <title>CatTroll</title>
 
 <style>
-:root{
-  --bg:#0b0f1a;
-  --panel:#141a2a;
-  --tile:#4caf50;
-  --goal:#e53935;
-  --spawn:#ffca28;
-  --accent:#2979ff;
-}
-
 body{
   margin:0;
-  font-family:Arial, sans-serif;
-  background:var(--bg);
+  background:#111;
   color:#fff;
+  font-family:Arial, sans-serif;
   user-select:none;
 }
 
 button{
-  padding:10px 14px;
+  padding:8px 12px;
   border:none;
-  border-radius:8px;
-  background:#2a2f45;
+  border-radius:6px;
+  background:#333;
   color:#fff;
   font-weight:bold;
 }
 
 button.active{
-  background:var(--accent);
-  box-shadow:0 0 10px var(--accent);
+  background:#2196f3;
 }
 
-#editor-tela,#jogo-tela{
+#editor, #jogo{
   display:none;
   flex-direction:column;
   align-items:center;
@@ -45,11 +35,11 @@ button.active{
   padding:10px;
 }
 
-#editor-tela{display:flex;}
+#editor{ display:flex; }
 
 #toolbar{
   display:flex;
-  gap:10px;
+  gap:8px;
   flex-wrap:wrap;
   justify-content:center;
 }
@@ -57,7 +47,7 @@ button.active{
 #grid{
   display:grid;
   background:#000;
-  touch-action:none;
+  border:2px solid #444;
 }
 
 .tile{
@@ -65,12 +55,17 @@ button.active{
   height:16px;
   border:1px solid #111;
 }
-.platform{background:var(--tile);}
-.goal{background:var(--goal);}
-.spawn{background:var(--spawn);}
 
-canvas{background:#000;}
+.platform{ background:#4caf50; }
+.goal{ background:#e53935; }
+.spawn{ background:#ffca28; }
 
+canvas{
+  background:#000;
+  border:2px solid #444;
+}
+
+/* joystick */
 #joystick{
   position:fixed;
   bottom:20px;
@@ -86,7 +81,7 @@ canvas{background:#000;}
   width:50px;
   height:50px;
   border-radius:50%;
-  background:rgba(255,255,255,.5);
+  background:rgba(255,255,255,.4);
   left:35px;
   top:35px;
 }
@@ -95,18 +90,18 @@ canvas{background:#000;}
 
 <body>
 
-<div id="editor-tela">
+<div id="editor">
   <div id="toolbar">
-    <button id="bPlat" onclick="setModo('plataforma')">Plataforma</button>
-    <button id="bSpawn" onclick="setModo('spawn')">Spawn</button>
-    <button id="bGoal" onclick="setModo('goal')">Chegada</button>
-    <button onclick="mostrarJogo()">Testar Fase</button>
+    <button id="bPlat">Plataforma</button>
+    <button id="bSpawn">Spawn</button>
+    <button id="bGoal">Chegada</button>
+    <button id="bTest">Testar Fase</button>
   </div>
   <div id="grid"></div>
 </div>
 
-<div id="jogo-tela">
-  <canvas id="game" width="360" height="640"></canvas>
+<div id="jogo">
+  <canvas id="canvas" width="360" height="480"></canvas>
 </div>
 
 <div id="joystick">
@@ -115,35 +110,58 @@ canvas{background:#000;}
 
 <script>
 /* ===== EDITOR ===== */
-const TILE=16;
-let COLS=Math.floor(innerWidth*0.9/TILE);
-let ROWS=Math.floor(innerHeight*0.6/TILE);
-let map=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-let modo='plataforma';
-let pintando=false;
+const TILE = 16;
+const COLS = Math.floor(innerWidth*0.9 / TILE);
+const ROWS = Math.floor(innerHeight*0.6 / TILE);
 
-const grid=document.getElementById('grid');
-grid.style.gridTemplateColumns=`repeat(${COLS},${TILE}px)`;
+const editor = document.getElementById("editor");
+const jogo = document.getElementById("jogo");
+const grid = document.getElementById("grid");
+
+grid.style.gridTemplateColumns = `repeat(${COLS}, ${TILE}px)`;
+
+let map = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+let modo = "plataforma";
+let pintando = false;
+
+const bPlat = document.getElementById("bPlat");
+const bSpawn = document.getElementById("bSpawn");
+const bGoal = document.getElementById("bGoal");
+const bTest = document.getElementById("bTest");
 
 function setModo(m){
-  modo=m;
-  document.querySelectorAll('#toolbar button').forEach(b=>b.classList.remove('active'));
-  if(m==='plataforma')bPlat.classList.add('active');
-  if(m==='spawn')bSpawn.classList.add('active');
-  if(m==='goal')bGoal.classList.add('active');
+  modo = m;
+  [bPlat,bSpawn,bGoal].forEach(b=>b.classList.remove("active"));
+  if(m==="plataforma") bPlat.classList.add("active");
+  if(m==="spawn") bSpawn.classList.add("active");
+  if(m==="goal") bGoal.classList.add("active");
 }
-setModo('plataforma');
+setModo("plataforma");
 
-function criarGrid(){
-  grid.innerHTML='';
+function limpar(valor){
+  for(let y=0;y<ROWS;y++)
+    for(let x=0;x<COLS;x++)
+      if(map[y][x]===valor) map[y][x]=0;
+}
+
+function pintar(x,y){
+  if(modo==="plataforma") map[y][x]=1;
+  if(modo==="spawn"){ limpar(3); map[y][x]=3; }
+  if(modo==="goal"){ limpar(2); map[y][x]=2; }
+  render();
+}
+
+function render(){
+  grid.innerHTML="";
   for(let y=0;y<ROWS;y++){
     for(let x=0;x<COLS;x++){
-      const d=document.createElement('div');
-      d.className='tile';
-      if(map[y][x]==1)d.classList.add('platform');
-      if(map[y][x]==2)d.classList.add('goal');
-      if(map[y][x]==3)d.classList.add('spawn');
-      d.onpointerdown=()=>{pintar(x,y);pintando=true;}
+      const d=document.createElement("div");
+      d.className="tile";
+      if(map[y][x]==1)d.classList.add("platform");
+      if(map[y][x]==2)d.classList.add("goal");
+      if(map[y][x]==3)d.classList.add("spawn");
+
+      d.onpointerdown=()=>{pintar(x,y); pintando=true;}
       d.onpointerenter=()=>{if(pintando)pintar(x,y);}
       grid.appendChild(d);
     }
@@ -151,35 +169,23 @@ function criarGrid(){
 }
 window.onpointerup=()=>pintando=false;
 
-function limpar(valor){
-  for(let y=0;y<ROWS;y++)
-    for(let x=0;x<COLS;x++)
-      if(map[y][x]==valor)map[y][x]=0;
-}
-
-function pintar(x,y){
-  if(modo==='plataforma')map[y][x]=1;
-  if(modo==='goal'){limpar(2);map[y][x]=2;}
-  if(modo==='spawn'){limpar(3);map[y][x]=3;}
-  criarGrid();
-}
-criarGrid();
+render();
 
 /* ===== JOGO ===== */
-const canvas=document.getElementById('game');
-const ctx=canvas.getContext('2d');
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
 const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
-const img=new Image();
-img.src="assets/icon-512.png";
-
 const gravity=0.4;
 let keys={l:false,r:false};
 
-function achar(valor){
+const img = new Image();
+img.src="assets/icon-512.png";
+
+function achar(v){
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++)
-      if(map[y][x]==valor)return{x,y};
+      if(map[y][x]===v)return{x,y};
   return null;
 }
 
@@ -200,86 +206,76 @@ function update(){
     player.vy=0;
     player.onGround=true;
   }
-
   if(keys.l&&!colisao(player.x-2,player.y))player.x-=2;
   if(keys.r&&!colisao(player.x+2,player.y))player.x+=2;
 
   const cx=Math.floor((player.x+8)/TILE);
   const cy=Math.floor((player.y+8)/TILE);
-  if(map[cy]?.[cx]==2){
-    alert("🎉 Venceu!");
-    mostrarEditor();
-  }
-
-  if(player.y>canvas.height){
-    alert("💀 Caiu!");
-    mostrarEditor();
-  }
+  if(map[cy]?.[cx]==2){ alert("🎉 Venceu!"); mostrarEditor(); }
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++){
-      if(map[y][x]==1)ctx.fillStyle="#4caf50";
-      if(map[y][x]==2)ctx.fillStyle="#e53935";
-      if(map[y][x]==3)ctx.fillStyle="#ffca28";
-      if(map[y][x])ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+      if(map[y][x]){
+        ctx.fillStyle = map[y][x]==1?"#4caf50":map[y][x]==2?"#e53935":"#ffca28";
+        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+      }
     }
   ctx.drawImage(img,player.x,player.y,player.w,player.h);
 }
 
-function loop(){update();draw();requestAnimationFrame(loop);}
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
 function mostrarJogo(){
-  const spawn=achar(3);
-  const goal=achar(2);
-  if(!spawn||!goal){
-    alert("⚠️ Spawn e Chegada são obrigatórios!");
-    return;
-  }
-  editor-tela.style.display="none";
-  jogo-tela.style.display="flex";
+  const s=achar(3), g=achar(2);
+  if(!s||!g){ alert("Spawn e Chegada são obrigatórios"); return; }
+  editor.style.display="none";
+  jogo.style.display="flex";
   joystick.style.display="block";
-  player.x=spawn.x*TILE;
-  player.y=spawn.y*TILE;
-  player.vy=0;
+  player.x=s.x*TILE; player.y=s.y*TILE; player.vy=0;
   loop();
 }
-
 function mostrarEditor(){
-  editor-tela.style.display="flex";
-  jogo-tela.style.display="none";
+  jogo.style.display="none";
+  editor.style.display="flex";
   joystick.style.display="none";
 }
 
-/* ===== CONTROLES ===== */
+bPlat.onclick=()=>setModo("plataforma");
+bSpawn.onclick=()=>setModo("spawn");
+bGoal.onclick=()=>setModo("goal");
+bTest.onclick=mostrarJogo;
+
+/* teclado */
 onkeydown=e=>{
-  if(e.key=="ArrowLeft")keys.l=true;
-  if(e.key=="ArrowRight")keys.r=true;
-  if(e.key=="ArrowUp"&&player.onGround)player.vy=-8;
+  if(e.key==="ArrowLeft")keys.l=true;
+  if(e.key==="ArrowRight")keys.r=true;
+  if(e.key==="ArrowUp"&&player.onGround)player.vy=-8;
 }
 onkeyup=e=>{
-  if(e.key=="ArrowLeft")keys.l=false;
-  if(e.key=="ArrowRight")keys.r=false;
-}
+  if(e.key==="ArrowLeft")keys.l=false;
+  if(e.key==="ArrowRight")keys.r=false;
+};
 
-/* ===== JOYSTICK ===== */
-const joy=document.getElementById('joystick');
-const stick=document.getElementById('stick');
+/* joystick simples */
+const joystick=document.getElementById("joystick");
+const stick=document.getElementById("stick");
 
-joy.onpointermove=e=>{
+joystick.onpointermove=e=>{
   if(e.buttons){
-    let x=e.offsetX-60;
-    if(x<-15)keys.l=true; else keys.l=false;
-    if(x>15)keys.r=true; else keys.r=false;
-    stick.style.left=60+Math.max(-40,Math.min(40,x))-25+"px";
+    const dx=e.offsetX-60;
+    keys.l=dx<-15;
+    keys.r=dx>15;
+    stick.style.left=60+Math.max(-40,Math.min(40,dx))-25+"px";
   }
 };
-joy.onpointerup=()=>{
+joystick.onpointerup=()=>{
   stick.style.left="35px";
   keys.l=keys.r=false;
 };
 </script>
+
 </body>
 </html>
