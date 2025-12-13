@@ -15,14 +15,16 @@ body{
 }
 
 button{
-  padding:8px 12px;
+  padding:10px 14px;
   border:none;
-  border-radius:6px;
+  border-radius:8px;
   background:#333;
   color:#fff;
   font-weight:bold;
+  font-size:14px;
 }
 
+button:hover{ background:#555; }
 button.active{ background:#2196f3; }
 
 #editor,#jogo{
@@ -64,6 +66,20 @@ canvas{
   border:2px solid #444;
 }
 
+/* overlays */
+.overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.75);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+}
+
+.overlay h2{ margin:0; }
+
 /* joystick */
 #joystick{
   position:fixed;
@@ -84,6 +100,18 @@ canvas{
   left:35px;
   top:35px;
 }
+
+/* botão pulo */
+#jumpBtn{
+  position:fixed;
+  bottom:30px;
+  right:30px;
+  width:80px;
+  height:80px;
+  border-radius:50%;
+  background:#2196f3;
+  display:none;
+}
 </style>
 </head>
 
@@ -91,20 +119,37 @@ canvas{
 
 <div id="editor">
   <div id="toolbar">
-    <button id="bPlat">Plataforma</button>
-    <button id="bSpawn">Spawn</button>
-    <button id="bGoal">Chegada</button>
-    <button id="bDel">Delete</button>
-    <button id="bTest">Testar</button>
+    <button onclick="setModo('plataforma')">Plataforma</button>
+    <button onclick="setModo('spawn')">Spawn</button>
+    <button onclick="setModo('goal')">Chegada</button>
+    <button onclick="setModo('delete')">Delete</button>
+    <button onclick="mostrarJogo()">Testar</button>
   </div>
   <div id="grid"></div>
 </div>
 
 <div id="jogo">
-  <canvas id="canvas" width="360" height="480"></canvas>
+  <div style="position:relative">
+    <canvas id="canvas" width="360" height="480"></canvas>
+
+    <div id="overlayWin" class="overlay" style="display:none">
+      <h2>🎉 Você Ganhou!</h2>
+      <button onclick="mostrarJogo()">Rejogar</button>
+      <button onclick="mostrarEditor()">Editor</button>
+      <button onclick="mostrarEditor()">Menu</button>
+    </div>
+
+    <div id="overlayLose" class="overlay" style="display:none">
+      <h2>💀 Você Morreu</h2>
+      <button onclick="mostrarJogo()">Rejogar</button>
+      <button onclick="mostrarEditor()">Editor</button>
+      <button onclick="mostrarEditor()">Menu</button>
+    </div>
+  </div>
 </div>
 
 <div id="joystick"><div id="stick"></div></div>
+<button id="jumpBtn">⬆</button>
 
 <script>
 /* ===== CONFIG ===== */
@@ -112,34 +157,17 @@ const TILE=16;
 const COLS=Math.floor(innerWidth*0.9/TILE);
 const ROWS=Math.floor(innerHeight*0.6/TILE);
 
-/* ===== ELEMENTOS ===== */
-const editor=document.getElementById("editor");
-const jogo=document.getElementById("jogo");
-const grid=document.getElementById("grid");
-grid.style.gridTemplateColumns=`repeat(${COLS},${TILE}px)`;
-
 /* ===== MAPA ===== */
 let map=Array.from({length:ROWS},()=>Array(COLS).fill(0));
 let modo="plataforma";
 let pintando=false;
 
-/* ===== BOTÕES ===== */
-const bPlat=bSpawn=bGoal=bDel=bTest=null;
-const btns={
-  plataforma:document.getElementById("bPlat"),
-  spawn:document.getElementById("bSpawn"),
-  goal:document.getElementById("bGoal"),
-  delete:document.getElementById("bDel")
-};
-
-function setModo(m){
-  modo=m;
-  Object.values(btns).forEach(b=>b.classList.remove("active"));
-  if(btns[m]) btns[m].classList.add("active");
-}
-setModo("plataforma");
-
 /* ===== EDITOR ===== */
+const grid=document.getElementById("grid");
+grid.style.gridTemplateColumns=`repeat(${COLS},${TILE}px)`;
+
+function setModo(m){ modo=m; }
+
 function limpar(v){
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++)
@@ -163,10 +191,11 @@ function render(){
       if(map[y][x]==2)d.classList.add("goal");
       if(map[y][x]==3)d.classList.add("spawn");
 
-      d.addEventListener("mousedown",()=>{pintando=true;pintar(x,y);render();});
-      d.addEventListener("mouseenter",()=>{if(pintando){pintar(x,y);render();}});
-      d.addEventListener("touchstart",e=>{e.preventDefault();pintando=true;pintar(x,y);render();});
-      d.addEventListener("touchmove",e=>{
+      d.onmousedown=()=>{pintando=true;pintar(x,y);render();}
+      d.onmouseenter=()=>{if(pintando){pintar(x,y);render();}}
+
+      d.ontouchstart=e=>{e.preventDefault();pintando=true;pintar(x,y);render();}
+      d.ontouchmove=e=>{
         e.preventDefault();
         const t=e.touches[0];
         const el=document.elementFromPoint(t.clientX,t.clientY);
@@ -175,29 +204,29 @@ function render(){
           pintar(i%COLS,Math.floor(i/COLS));
           render();
         }
-      });
+      };
 
       grid.appendChild(d);
     }
   }
 }
-document.addEventListener("mouseup",()=>pintando=false);
-document.addEventListener("touchend",()=>pintando=false);
+onmouseup=()=>pintando=false;
+ontouchend=()=>pintando=false;
 render();
 
 /* ===== JOGO ===== */
 const canvas=document.getElementById("canvas");
 const ctx=canvas.getContext("2d");
-ctx.imageSmoothingEnabled=true;
 
 const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
-const gravity=0.4;
+const gravity=0.45;
+
 let keys={l:false,r:false};
 let joyX=0;
-let estado="jogo"; // jogo | ganhou | morreu
+let estado="jogo";
 
-const img=new Image();
-img.src="assets/icon-512.png";
+const win=document.getElementById("overlayWin");
+const lose=document.getElementById("overlayLose");
 
 function achar(v){
   for(let y=0;y<ROWS;y++)
@@ -214,8 +243,21 @@ function colisao(nx,ny){
   return map[t]?.[l]==1||map[t]?.[r]==1||map[b]?.[l]==1||map[b]?.[r]==1;
 }
 
+/* EXPULSÃO DE PLATAFORMA */
+function expulsar(){
+  if(!colisao(player.x,player.y)) return;
+  for(let i=0;i<10;i++){
+    if(!colisao(player.x,player.y-1)){ player.y--; return; }
+    if(!colisao(player.x-1,player.y)){ player.x--; return; }
+    if(!colisao(player.x+1,player.y)){ player.x++; return; }
+    player.y--;
+  }
+}
+
 function update(){
   if(estado!=="jogo") return;
+
+  expulsar();
 
   player.vy+=gravity;
   if(!colisao(player.x,player.y+player.vy)){
@@ -227,37 +269,25 @@ function update(){
   }
 
   player.vx=(keys.l?-1:0)+(keys.r?1:0)+joyX;
-  player.vx=Math.max(-1,Math.min(1,player.vx))*2.5;
+  player.vx=Math.max(-1,Math.min(1,player.vx))*2.6;
   if(!colisao(player.x+player.vx,player.y)) player.x+=player.vx;
 
-  if(player.y>canvas.height){ estado="morreu"; }
+  if(player.y>canvas.height){ estado="lose"; lose.style.display="flex"; }
 
   const cx=Math.floor((player.x+8)/TILE);
   const cy=Math.floor((player.y+8)/TILE);
-  if(map[cy]?.[cx]==2){ estado="ganhou"; }
+  if(map[cy]?.[cx]==2){ estado="win"; win.style.display="flex"; }
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++){
       if(map[y][x]==1){ctx.fillStyle="#4caf50";ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}
       if(map[y][x]==2){ctx.fillStyle="#e53935";ctx.fillRect(x*TILE,y*TILE,TILE,TILE);}
     }
-
-  ctx.drawImage(img,player.x,player.y,player.w,player.h);
-
-  if(estado!=="jogo"){
-    ctx.fillStyle="rgba(0,0,0,.7)";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="#fff";
-    ctx.font="20px Arial";
-    ctx.textAlign="center";
-    ctx.fillText(estado==="ganhou"?"VOCÊ GANHOU!":"VOCÊ MORREU",canvas.width/2,canvas.height/2-20);
-    ctx.font="14px Arial";
-    ctx.fillText("Toque para voltar ao editor",canvas.width/2,canvas.height/2+10);
-  }
+  ctx.fillStyle="#ff0";
+  ctx.fillRect(player.x,player.y,player.w,player.h);
 }
 
 function loop(){update();draw();requestAnimationFrame(loop);}
@@ -265,9 +295,13 @@ function loop(){update();draw();requestAnimationFrame(loop);}
 function mostrarJogo(){
   const s=achar(3), g=achar(2);
   if(!s||!g) return alert("Spawn e Chegada obrigatórios");
-  editor.style.display="none";
-  jogo.style.display="flex";
+
+  document.getElementById("editor").style.display="none";
+  document.getElementById("jogo").style.display="flex";
   joystick.style.display="block";
+  jumpBtn.style.display="block";
+  win.style.display=lose.style.display="none";
+
   player.x=s.x*TILE;
   player.y=s.y*TILE-1;
   player.vy=0;
@@ -275,25 +309,18 @@ function mostrarJogo(){
   loop();
 }
 function mostrarEditor(){
-  jogo.style.display="none";
-  editor.style.display="flex";
-  joystick.style.display="none";
+  document.getElementById("jogo").style.display="none";
+  document.getElementById("editor").style.display="flex";
+  joystick.style.display=jumpBtn.style.display="none";
 }
 
-/* cliques */
-document.getElementById("bPlat").onclick=()=>setModo("plataforma");
-document.getElementById("bSpawn").onclick=()=>setModo("spawn");
-document.getElementById("bGoal").onclick=()=>setModo("goal");
-document.getElementById("bDel").onclick=()=>setModo("delete");
-document.getElementById("bTest").onclick=mostrarJogo;
-
-canvas.onclick=()=>{ if(estado!=="jogo") mostrarEditor(); };
-
-/* teclado */
+/* CONTROLES */
 onkeydown=e=>{
   if(e.key==="ArrowLeft")keys.l=true;
   if(e.key==="ArrowRight")keys.r=true;
-  if(e.key==="ArrowUp"&&player.onGround)player.vy=-8;
+  if((e.key==="ArrowUp"||e.key===" ")&&player.onGround){
+    player.vy=-8;
+  }
 };
 onkeyup=e=>{
   if(e.key==="ArrowLeft")keys.l=false;
@@ -302,13 +329,15 @@ onkeyup=e=>{
 
 /* joystick */
 const joystick=document.getElementById("joystick");
-const stick=document.getElementById("stick");
-
 joystick.addEventListener("touchmove",e=>{
-  const rect=joystick.getBoundingClientRect();
-  joyX=Math.max(-1,Math.min(1,(e.touches[0].clientX-(rect.left+60))/40));
+  const r=joystick.getBoundingClientRect();
+  joyX=Math.max(-1,Math.min(1,(e.touches[0].clientX-(r.left+60))/40));
 });
 joystick.addEventListener("touchend",()=>joyX=0);
+
+/* botão pulo */
+const jumpBtn=document.getElementById("jumpBtn");
+jumpBtn.ontouchstart=()=>{ if(player.onGround) player.vy=-8; };
 </script>
 
 </body>
