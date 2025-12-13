@@ -27,7 +27,7 @@ button.active{
   background:#2196f3;
 }
 
-#editor, #jogo{
+#editor,#jogo{
   display:none;
   flex-direction:column;
   align-items:center;
@@ -73,7 +73,7 @@ canvas{
   width:120px;
   height:120px;
   border-radius:50%;
-  background:rgba(255,255,255,.1);
+  background:rgba(255,255,255,.08);
   display:none;
 }
 #stick{
@@ -81,7 +81,7 @@ canvas{
   width:50px;
   height:50px;
   border-radius:50%;
-  background:rgba(255,255,255,.4);
+  background:rgba(255,255,255,.45);
   left:35px;
   top:35px;
 }
@@ -168,16 +168,23 @@ function render(){
   }
 }
 window.onpointerup=()=>pintando=false;
-
 render();
 
 /* ===== JOGO ===== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = true;
 
-const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
+const player={
+  x:0,y:0,
+  w:20,h:20,
+  vx:0,vy:0,
+  onGround:false
+};
+
 const gravity=0.4;
 let keys={l:false,r:false};
+let joyX = 0;
 
 const img = new Image();
 img.src="assets/icon-512.png";
@@ -206,35 +213,61 @@ function update(){
     player.vy=0;
     player.onGround=true;
   }
-  if(keys.l&&!colisao(player.x-2,player.y))player.x-=2;
-  if(keys.r&&!colisao(player.x+2,player.y))player.x+=2;
 
-  const cx=Math.floor((player.x+8)/TILE);
-  const cy=Math.floor((player.y+8)/TILE);
-  if(map[cy]?.[cx]==2){ alert("🎉 Venceu!"); mostrarEditor(); }
+  const inputX = (keys.l?-1:0) + (keys.r?1:0) + joyX;
+  player.vx = Math.max(-1,Math.min(1,inputX)) * 2.5;
+
+  if(!colisao(player.x+player.vx,player.y))
+    player.x+=player.vx;
+
+  const cx=Math.floor((player.x+player.w/2)/TILE);
+  const cy=Math.floor((player.y+player.h/2)/TILE);
+  if(map[cy]?.[cx]==2){
+    alert("🎉 Venceu!");
+    mostrarEditor();
+  }
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++){
-      if(map[y][x]){
-        ctx.fillStyle = map[y][x]==1?"#4caf50":map[y][x]==2?"#e53935":"#ffca28";
+      if(map[y][x]==1){
+        ctx.fillStyle="#4caf50";
         ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
       }
+      if(map[y][x]==2){
+        ctx.fillStyle="#e53935";
+        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+      }
+      /* spawn NÃO desenha no jogo */
     }
-  ctx.drawImage(img,player.x,player.y,player.w,player.h);
+
+  ctx.drawImage(
+    img,
+    player.x-2,
+    player.y-2,
+    player.w+4,
+    player.h+4
+  );
 }
 
 function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
 function mostrarJogo(){
   const s=achar(3), g=achar(2);
-  if(!s||!g){ alert("Spawn e Chegada são obrigatórios"); return; }
+  if(!s||!g){
+    alert("Spawn e Chegada são obrigatórios");
+    return;
+  }
   editor.style.display="none";
   jogo.style.display="flex";
   joystick.style.display="block";
-  player.x=s.x*TILE; player.y=s.y*TILE; player.vy=0;
+
+  player.x=s.x*TILE;
+  player.y=s.y*TILE;
+  player.vy=0;
   loop();
 }
 function mostrarEditor(){
@@ -242,11 +275,6 @@ function mostrarEditor(){
   editor.style.display="flex";
   joystick.style.display="none";
 }
-
-bPlat.onclick=()=>setModo("plataforma");
-bSpawn.onclick=()=>setModo("spawn");
-bGoal.onclick=()=>setModo("goal");
-bTest.onclick=mostrarJogo;
 
 /* teclado */
 onkeydown=e=>{
@@ -259,21 +287,21 @@ onkeyup=e=>{
   if(e.key==="ArrowRight")keys.r=false;
 };
 
-/* joystick simples */
+/* ===== JOYSTICK ANALÓGICO ===== */
 const joystick=document.getElementById("joystick");
 const stick=document.getElementById("stick");
 
 joystick.onpointermove=e=>{
   if(e.buttons){
-    const dx=e.offsetX-60;
-    keys.l=dx<-15;
-    keys.r=dx>15;
-    stick.style.left=60+Math.max(-40,Math.min(40,dx))-25+"px";
+    const rect=joystick.getBoundingClientRect();
+    const dx=e.clientX-(rect.left+60);
+    joyX=Math.max(-1,Math.min(1,dx/40));
+    stick.style.left=60+dx-25+"px";
   }
 };
 joystick.onpointerup=()=>{
+  joyX=0;
   stick.style.left="35px";
-  keys.l=keys.r=false;
 };
 </script>
 
