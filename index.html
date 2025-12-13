@@ -2,198 +2,314 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>CatTroll</title>
+
 <style>
-html,body{margin:0;padding:0;overflow:hidden;background:#1e1e1e;color:#fff;font-family:monospace}
-canvas{display:block;background:#cfd8dc}
-#ui{position:fixed;top:6px;left:6px;display:flex;gap:6px;flex-wrap:wrap;z-index:10}
-button{padding:6px 10px;border:0;border-radius:6px;font-weight:bold;cursor:pointer}
-button.active{background:#4caf50;color:#fff}
-#overlay{position:fixed;inset:0;background:#000c;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:20}
-#overlay button{font-size:16px;padding:10px 20px}
-#joystick{position:fixed;left:20px;bottom:20px;width:120px;height:120px;border-radius:50%;background:#fff2;display:none;z-index:15}
-#stick{width:48px;height:48px;border-radius:50%;background:#2196f3;position:absolute;left:36px;top:36px}
-#jump{position:fixed;right:20px;bottom:40px;width:70px;height:70px;border-radius:50%;background:#e53935;color:#fff;font-size:24px;border:0;display:none;z-index:15}
-@media(max-width:900px){#joystick,#jump{display:block}}
+body{
+  margin:0;
+  background:#111;
+  color:#fff;
+  font-family:Arial, sans-serif;
+  user-select:none;
+}
+
+button{
+  padding:10px 14px;
+  border:none;
+  border-radius:8px;
+  background:#333;
+  color:#fff;
+  font-weight:bold;
+  font-size:14px;
+}
+
+button:hover{ background:#555; }
+
+#editor,#jogo{
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+}
+
+#editor{ display:flex; }
+
+#toolbar{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+#grid{
+  display:grid;
+  background:#000;
+  border:2px solid #444;
+  touch-action:none;
+}
+
+.tile{
+  width:16px;
+  height:16px;
+  border:1px solid #111;
+}
+
+.platform{ background:#4caf50; }
+.goal{ background:#e53935; }
+.spawn{ background:#ffca28; }
+
+canvas{
+  background:#000;
+  border:2px solid #444;
+}
+
+.overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.75);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+}
+
+#joystick{
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  background:rgba(255,255,255,.08);
+  display:none;
+}
+#stick{
+  position:absolute;
+  width:50px;
+  height:50px;
+  border-radius:50%;
+  background:rgba(255,255,255,.45);
+  left:35px;
+  top:35px;
+}
+
+#jumpBtn{
+  position:fixed;
+  bottom:30px;
+  right:30px;
+  width:80px;
+  height:80px;
+  border-radius:50%;
+  background:#2196f3;
+  display:none;
+}
+
+/* versão discreta */
+#versionTag{
+  position:fixed;
+  bottom:4px;
+  right:6px;
+  font-size:10px;
+  opacity:.25;
+  color:#aaa;
+  pointer-events:none;
+}
 </style>
 </head>
+
 <body>
 
-<div id="ui">
-  <button data-mode="platform">Plataforma</button>
-  <button data-mode="spawn">Spawn</button>
-  <button data-mode="goal">Chegada</button>
-  <button data-mode="delete">Delete</button>
-  <button id="test">Testar</button>
-  <button id="undo">↶</button>
-  <button id="redo">↷</button>
+<div id="editor">
+  <div id="toolbar">
+    <button onclick="setModo('plataforma')">Plataforma</button>
+    <button onclick="setModo('spawn')">Spawn</button>
+    <button onclick="setModo('goal')">Chegada</button>
+    <button onclick="setModo('delete')">Delete</button>
+    <button onclick="mostrarJogo()">Testar</button>
+  </div>
+  <div id="grid"></div>
 </div>
 
-<canvas id="c"></canvas>
+<div id="jogo">
+  <div style="position:relative">
+    <canvas id="canvas" width="360" height="480"></canvas>
 
-<div id="overlay">
-  <h1 id="msg"></h1>
-  <button id="again">Rejogar</button>
-  <button id="back">Editor</button>
+    <div id="overlayWin" class="overlay" style="display:none">
+      <h2>🎉 Você Ganhou!</h2>
+      <button onclick="mostrarJogo()">Rejogar</button>
+      <button onclick="mostrarEditor()">Editor</button>
+    </div>
+
+    <div id="overlayLose" class="overlay" style="display:none">
+      <h2>💀 Você Morreu</h2>
+      <button onclick="mostrarJogo()">Rejogar</button>
+      <button onclick="mostrarEditor()">Editor</button>
+    </div>
+  </div>
 </div>
 
 <div id="joystick"><div id="stick"></div></div>
-<button id="jump">⤒</button>
+<button id="jumpBtn">⬆</button>
+<div id="versionTag"></div>
 
 <script>
-// ===== CONFIG =====
-const TILE=16;
-const c=document.getElementById('c');
-const ctx=c.getContext('2d');
-let W,H;
+/* ===== VERSIONAMENTO ===== */
+let VERSION="0.017";
+const versionTag=document.getElementById("versionTag");
+versionTag.textContent="v"+VERSION;
 
-function resize(){W=c.width=innerWidth;H=c.height=innerHeight}
-addEventListener('resize',resize);resize();
+let versionHistory=JSON.parse(localStorage.getItem("CatTroll_versions")||"{}");
 
-// ===== MAPA =====
-let map={}; // key "x,y" -> 1 platform | 2 spawn | 3 goal
-let spawn=null,goal=null;
-let cam={x:0,y:0,zoom:1};
+function salvarVersao(){
+  if(versionHistory[VERSION])return;
+  versionHistory[VERSION]={
+    map:JSON.parse(JSON.stringify(map)),
+    data:Date.now()
+  };
+  localStorage.setItem("CatTroll_versions",JSON.stringify(versionHistory));
+}
 
-// ===== UNDO / REDO =====
-let history=[],redoStack=[];
-function snapshot(){history.push(JSON.stringify({map,spawn,goal}));if(history.length>50)history.shift();redoStack=[]}
+function restaurarVersao(v){
+  if(!versionHistory[v])return alert("Versão não encontrada");
+  map=JSON.parse(JSON.stringify(versionHistory[v].map));
+  render();
+}
 
-// ===== EDITOR =====
-let mode='platform';
-document.querySelectorAll('#ui button[data-mode]').forEach(b=>{
-  b.onclick=()=>{
-    document.querySelectorAll('#ui button').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    mode=b.dataset.mode;
+onkeydown=e=>{
+  if(e.ctrlKey&&e.shiftKey&&e.key==="R"){
+    const v=prompt("Restaurar versão:");
+    if(v)restaurarVersao(v);
   }
-});
-document.querySelector('[data-mode="platform"]').classList.add('active');
+};
 
-let painting=false;
-c.addEventListener('mousedown',e=>{painting=true;edit(e)});
-addEventListener('mouseup',()=>painting=false);
-c.addEventListener('mousemove',e=>{if(painting)edit(e)});
+/* ===== CONFIG ===== */
+const TILE=16;
+const COLS=Math.floor(innerWidth*0.9/TILE);
+const ROWS=Math.floor(innerHeight*0.6/TILE);
 
-function edit(e){
-  if(playing)return;
-  const r=c.getBoundingClientRect();
-  const mx=(e.clientX-r.left)/cam.zoom+cam.x;
-  const my=(e.clientY-r.top)/cam.zoom+cam.y;
-  const tx=Math.floor(mx/TILE),ty=Math.floor(my/TILE);
-  const k=`${tx},${ty}`;
-  snapshot();
-  if(mode==='platform') map[k]=1;
-  if(mode==='delete'){ if(map[k])delete map[k]; if(spawn?.x===tx&&spawn.y===ty)spawn=null; if(goal?.x===tx&&goal.y===ty)goal=null }
-  if(mode==='spawn'){ if(spawn)delete map[`${spawn.x},${spawn.y}`]; spawn={x:tx,y:ty}; map[k]=2 }
-  if(mode==='goal'){ if(goal)delete map[`${goal.x},${goal.y}`]; goal={x:tx,y:ty}; map[k]=3 }
+/* ===== MAPA ===== */
+let map=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+salvarVersao();
+
+let modo="plataforma";
+let pintando=false;
+
+/* ===== EDITOR ===== */
+const grid=document.getElementById("grid");
+grid.style.gridTemplateColumns=`repeat(${COLS},${TILE}px)`;
+
+function setModo(m){modo=m;}
+
+function limpar(v){
+  for(let y=0;y<ROWS;y++)
+    for(let x=0;x<COLS;x++)
+      if(map[y][x]===v)map[y][x]=0;
 }
 
-// ===== CAMERA EDITOR =====
-addEventListener('keydown',e=>{
-  if(playing)return;
-  if(e.key==='ArrowLeft')cam.x-=20;
-  if(e.key==='ArrowRight')cam.x+=20;
-  if(e.key==='ArrowUp')cam.y-=20;
-  if(e.key==='ArrowDown')cam.y+=20;
-});
-c.addEventListener('wheel',e=>{
-  if(playing)return;
-  cam.zoom+=e.deltaY*-0.001;
-  cam.zoom=Math.max(0.4,Math.min(2,cam.zoom));
-});
+function pintar(x,y){
+  if(modo==="plataforma")map[y][x]=1;
+  if(modo==="spawn"){limpar(3);map[y][x]=3;}
+  if(modo==="goal"){limpar(2);map[y][x]=2;}
+  if(modo==="delete")map[y][x]=0;
+  salvarVersao();
+}
 
-// ===== UNDO / REDO =====
-document.getElementById('undo').onclick=()=>{if(history.length){redoStack.push(JSON.stringify({map,spawn,goal}));const s=JSON.parse(history.pop());map=s.map;spawn=s.spawn;goal=s.goal}}
-document.getElementById('redo').onclick=()=>{if(redoStack.length){history.push(JSON.stringify({map,spawn,goal}));const s=JSON.parse(redoStack.pop());map=s.map;spawn=s.spawn;goal=s.goal}}
+function render(){
+  grid.innerHTML="";
+  for(let y=0;y<ROWS;y++)
+    for(let x=0;x<COLS;x++){
+      const d=document.createElement("div");
+      d.className="tile";
+      if(map[y][x]==1)d.classList.add("platform");
+      if(map[y][x]==2)d.classList.add("goal");
+      if(map[y][x]==3)d.classList.add("spawn");
+      d.onmousedown=()=>{pintando=true;pintar(x,y);render();}
+      d.onmouseenter=()=>{if(pintando){pintar(x,y);render();}}
+      grid.appendChild(d);
+    }
+}
+onmouseup=()=>pintando=false;
+render();
 
-// ===== JOGO =====
-let playing=false;
-const player={x:0,y:0,w:14,h:14,vx:0,vy:0,onGround:false};
-const GRAV=0.35;
-const SPEED=1.8;
-const JUMP=6;
+/* ===== JOGO ===== */
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+
+const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
+const gravity=.45;
+
 let keys={l:false,r:false};
+let estado="jogo";
 
-function startGame(){
-  if(!spawn||!goal)return alert('Spawn e chegada são obrigatórios');
-  playing=true;
-  player.x=spawn.x*TILE;
-  player.y=spawn.y*TILE-1;
-  player.vx=player.vy=0;
-  cam.zoom=1;
-  document.getElementById('overlay').style.display='none';
+const win=document.getElementById("overlayWin");
+const lose=document.getElementById("overlayLose");
+
+function achar(v){
+  for(let y=0;y<ROWS;y++)
+    for(let x=0;x<COLS;x++)
+      if(map[y][x]===v)return{x,y};
 }
 
-document.getElementById('test').onclick=startGame;
-
-document.getElementById('again').onclick=startGame;
-document.getElementById('back').onclick=()=>{playing=false;document.getElementById('overlay').style.display='none'};
-
-function solid(x,y){return map[`${x},${y}`]===1}
+function colisao(nx,ny){
+  const l=Math.floor(nx/TILE);
+  const r=Math.floor((nx+15)/TILE);
+  const t=Math.floor(ny/TILE);
+  const b=Math.floor((ny+15)/TILE);
+  return map[t]?.[l]==1||map[t]?.[r]==1||map[b]?.[l]==1||map[b]?.[r]==1;
+}
 
 function update(){
-  if(!playing)return;
-  player.vy+=GRAV;
-  player.x+=player.vx;
-  player.y+=player.vy;
-  const tx=Math.floor((player.x+player.w/2)/TILE);
-  const ty=Math.floor((player.y+player.h)/TILE);
-  if(solid(tx,ty)){
-    player.y=ty*TILE-player.h;
-    player.vy=0;player.onGround=true;
-  } else player.onGround=false;
-  if(map[`${tx},${Math.floor((player.y+player.h/2)/TILE)}`]===3){end('Você venceu!')}
-  if(player.y>10000)end('Você morreu');
-  cam.x=player.x-W/2;cam.y=player.y-H/2;
-}
-
-function end(t){playing=false;document.getElementById('msg').innerText=t;document.getElementById('overlay').style.display='flex'}
-
-// ===== INPUT =====
-addEventListener('keydown',e=>{
-  if(e.code==='ArrowLeft')keys.l=true;
-  if(e.code==='ArrowRight')keys.r=true;
-  if((e.code==='ArrowUp'||e.code==='Space')&&player.onGround){player.vy=-JUMP}
-});
-addEventListener('keyup',e=>{if(e.code==='ArrowLeft')keys.l=false;if(e.code==='ArrowRight')keys.r=false});
-
-setInterval(()=>{player.vx=(keys.l?-SPEED:0)+(keys.r?SPEED:0)},16);
-
-// ===== JOYSTICK =====
-const joy=document.getElementById('joystick'),stick=document.getElementById('stick');
-let jActive=false;
-joy.addEventListener('touchstart',e=>{jActive=true});
-joy.addEventListener('touchmove',e=>{
-  const r=joy.getBoundingClientRect();
-  const t=e.touches[0];
-  const dx=t.clientX-r.left-60;
-  const dy=t.clientY-r.top-60;
-  const dist=Math.min(40,Math.hypot(dx,dy));
-  const ang=Math.atan2(dy,dx);
-  stick.style.left=60+Math.cos(ang)*dist-24+'px';
-  stick.style.top=60+Math.sin(ang)*dist-24+'px';
-  player.vx=Math.cos(ang)*SPEED;
-});
-joy.addEventListener('touchend',()=>{jActive=false;player.vx=0;stick.style.left='36px';stick.style.top='36px'});
-
-document.getElementById('jump').onclick=()=>{if(player.onGround)player.vy=-JUMP};
-
-// ===== DRAW =====
-function draw(){
-  ctx.setTransform(cam.zoom,0,0,cam.zoom,-cam.x*cam.zoom,-cam.y*cam.zoom);
-  ctx.clearRect(cam.x,cam.y,W,H);
-  for(const k in map){
-    const [x,y]=k.split(',').map(Number);
-    if(map[k]===1){ctx.fillStyle='#4caf50';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
-    if(map[k]===3&&!playing){ctx.fillStyle='#f44336';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
-    if(map[k]===2&&!playing){ctx.fillStyle='#2196f3';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
+  if(estado!=="jogo")return;
+  player.vy+=gravity;
+  if(!colisao(player.x,player.y+player.vy)){
+    player.y+=player.vy;
+    player.onGround=false;
+  }else{
+    player.vy=0;
+    player.onGround=true;
   }
-  if(playing){ctx.fillStyle='#ffeb3b';ctx.fillRect(player.x,player.y,player.w,player.h)}
-  requestAnimationFrame(draw);
+  player.vx=(keys.l?-1:0)+(keys.r?1:0);
+  player.vx=Math.max(-1,Math.min(1,player.vx))*2.5;
+  if(!colisao(player.x+player.vx,player.y))player.x+=player.vx;
+  if(player.y>canvas.height){estado="lose";lose.style.display="flex";}
+  const cx=Math.floor((player.x+8)/TILE);
+  const cy=Math.floor((player.y+8)/TILE);
+  if(map[cy]?.[cx]==2){estado="win";win.style.display="flex";}
 }
-draw();
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let y=0;y<ROWS;y++)
+    for(let x=0;x<COLS;x++)
+      if(map[y][x]==1){
+        ctx.fillStyle="#4caf50";
+        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+      }
+  ctx.fillStyle="#ff0";
+  ctx.fillRect(player.x,player.y,16,16);
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+
+function mostrarJogo(){
+  const s=achar(3),g=achar(2);
+  if(!s||!g)return alert("Spawn e Chegada obrigatórios");
+  editor.style.display="none";
+  jogo.style.display="flex";
+  player.x=s.x*TILE;
+  player.y=s.y*TILE-1;
+  estado="jogo";
+  loop();
+}
+
+function mostrarEditor(){
+  jogo.style.display="none";
+  editor.style.display="flex";
+}
 </script>
+
 </body>
-</html>
+  </html>
