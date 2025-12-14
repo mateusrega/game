@@ -269,64 +269,151 @@ onkeydown=e=>{
   if(e.key==="ArrowRight")camX-=20;
   atualizarTransform();
 };
-
+<script>
 /* ===== JOGO ===== */
-const canvas=document.getElementById("canvas");
-const ctx=canvas.getContext("2d");
-const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
+const player={x:0,y:0,vx:0,vy:0,w:16,h:16,onGround:false};
 const gravity=0.4;
-let keys={l:false,r:false};
-let joyX=0;
-let estado="jogo";
+let left=false,right=false;
+let estado="jogando"; // jogando | ganhou | morreu
 
-function achar(v){
+/* câmera */
+let camGameX=0, camGameY=0;
+
+function find(v){
   for(let y=0;y<ROWS;y++)
     for(let x=0;x<COLS;x++)
-      if(map[y][x]===v)return{x,y};
+      if(map[y][x]==v)return{x,y};
+  return null;
 }
 
-function colisao(nx,ny){
+function collide(nx,ny){
   const l=Math.floor(nx/TILE);
-  const r=Math.floor((nx+15)/TILE);
+  const r=Math.floor((nx+player.w-1)/TILE);
   const t=Math.floor(ny/TILE);
-  const b=Math.floor((ny+15)/TILE);
+  const b=Math.floor((ny+player.h-1)/TILE);
   return map[t]?.[l]==1||map[t]?.[r]==1||map[b]?.[l]==1||map[b]?.[r]==1;
 }
 
 function update(){
+  if(estado!=="jogando") return;
+
   player.vy+=gravity;
-  if(!colisao(player.x,player.y+player.vy)){
-    player.y+=player.vy; player.onGround=false;
-  }else{ player.vy=0; player.onGround=true; }
 
-  player.vx=(keys.l?-1:0)+(keys.r?1:0)+joyX;
-  player.vx=Math.max(-1,Math.min(1,player.vx))*2.5;
-  if(!colisao(player.x+player.vx,player.y)) player.x+=player.vx;
+  if(!collide(player.x,player.y+player.vy)){
+    player.y+=player.vy;
+    player.onGround=false;
+  }else{
+    player.vy=0;
+    player.onGround=true;
+  }
 
-  if(map[Math.floor((player.y+8)/TILE)]?.[Math.floor((player.x+8)/TILE)]==2)
+  player.vx=(left?-1:0)+(right?1:0);
+  if(!collide(player.x+player.vx*2.5,player.y))
+    player.x+=player.vx*2.5;
+
+  /* MORTE */
+  if(player.y>ROWS*TILE){
+    estado="morreu";
+  }
+
+  /* VITÓRIA */
+  const cx=Math.floor((player.x+8)/TILE);
+  const cy=Math.floor((player.y+8)/TILE);
+  if(map[cy]?.[cx]==2){
     estado="ganhou";
+  }
+
+  /* câmera segue player */
+  camGameX=player.x-canvas.width/2+player.w/2;
+  camGameY=player.y-canvas.height/2+player.h/2;
 }
 
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(-camGameX,-camGameY);
+
+  /* mapa */
   for(let y=0;y<ROWS;y++)
-    for(let x=0;x<COLS;x++)
+    for(let x=0;x<COLS;x++){
       if(map[y][x]==1){
         ctx.fillStyle="#4caf50";
         ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
       }
-  ctx.fillStyle="#ff0";
-  ctx.fillRect(player.x,player.y,player.w,player.h);
+      if(map[y][x]==2){
+        ctx.fillStyle="#e53935";
+        ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+      }
+    }
+
+  /* PLAYER (gatinho simples) */
+  ctx.fillStyle="#ffcc80";
+  ctx.fillRect(player.x,player.y,16,16);
+  ctx.fillStyle="#000";
+  ctx.fillRect(player.x+4,player.y+5,2,2);
+  ctx.fillRect(player.x+10,player.y+5,2,2);
+
+  ctx.restore();
+
+  /* TELAS */
+  if(estado!=="jogando"){
+    ctx.fillStyle="rgba(0,0,0,.7)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle="#fff";
+    ctx.textAlign="center";
+    ctx.font="20px Arial";
+    ctx.fillText(
+      estado==="ganhou"?"VOCÊ GANHOU!":"VOCÊ MORREU",
+      canvas.width/2,
+      canvas.height/2-20
+    );
+
+    ctx.font="14px Arial";
+    ctx.fillText("Toque para continuar",canvas.width/2,canvas.height/2+10);
+  }
 }
 
-function loop(){update();draw();requestAnimationFrame(loop);}
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
 
+/* ===== CONTROLES ===== */
+onkeydown=e=>{
+  if(e.key==="ArrowLeft")left=true;
+  if(e.key==="ArrowRight")right=true;
+  if((e.key==="ArrowUp"||e.key===" ")&&player.onGround)
+    player.vy=-8;
+};
+onkeyup=e=>{
+  if(e.key==="ArrowLeft")left=false;
+  if(e.key==="ArrowRight")right=false;
+};
+
+/* clique após fim */
+canvas.onclick=()=>{
+  if(estado!=="jogando"){
+    mostrarEditor();
+  }
+};
+
+/* ===== START ===== */
 bTest.onclick=()=>{
-  const s=achar(3), g=achar(2);
-  if(!s||!g) return alert("Spawn e Chegada obrigatórios");
+  const s=find(3), g=find(2);
+  if(!s||!g)return alert("Spawn e Chegada obrigatórios");
+
   editor.style.display="none";
   jogo.style.display="flex";
-  player.x=s.x*TILE; player.y=s.y*TILE;
+  joystick.style.display="block";
+  jumpBtn.style.display="block";
+
+  player.x=s.x*TILE;
+  player.y=s.y*TILE;
+  player.vx=player.vy=0;
+  estado="jogando";
   loop();
 };
 </script>
