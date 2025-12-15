@@ -2,72 +2,62 @@ const TILE=16;
 const map=JSON.parse(localStorage.getItem('cattroll_map'));
 if(!map){location.href='editor.html'}
 
-const canvas=document.getElementById('canvas');
-const ctx=canvas.getContext('2d');
+const c=document.getElementById('c');
+const ctx=c.getContext('2d');
 
-const ROWS=map.length, COLS=map[0].length;
+let p={x:0,y:0,vx:0,vy:0,on:false};
 
-const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
-const gravity=0.45;
-let keys={l:false,r:false};
-
-function achar(v){
-  for(let y=0;y<ROWS;y++)
-    for(let x=0;x<COLS;x++)
+function find(v){
+  for(let y=0;y<map.length;y++)
+    for(let x=0;x<map[0].length;x++)
       if(map[y][x]==v) return{x,y};
 }
 
-const spawn=achar(3), goal=achar(2);
-player.x=spawn.x*TILE;
-player.y=spawn.y*TILE-1;
+const s=find(3);
+p.x=s.x*TILE;
+p.y=s.y*TILE;
 
 function solid(x,y){return map[y]?.[x]==1}
 function col(nx,ny){
-  const l=Math.floor(nx/TILE),r=Math.floor((nx+15)/TILE),
-        t=Math.floor(ny/TILE),b=Math.floor((ny+15)/TILE);
+  const l=nx>>4,r=(nx+15)>>4,t=ny>>4,b=(ny+15)>>4;
   return solid(l,t)||solid(r,t)||solid(l,b)||solid(r,b);
 }
 
-function update(){
-  player.vy+=gravity;
-  if(!col(player.x,player.y+player.vy)){
-    player.y+=player.vy;player.onGround=false;
-  }else{player.vy=0;player.onGround=true}
+let k={l:0,r:0};
 
-  player.vx=(keys.l?-1:0)+(keys.r?1:0);
-  if(!col(player.x+player.vx*2.5,player.y))
-    player.x+=player.vx*2.5;
+onkeydown=e=>{
+  if(e.key=='ArrowLeft')k.l=1;
+  if(e.key=='ArrowRight')k.r=1;
+  if(e.key=='ArrowUp'&&p.on)p.vy=-8;
+};
+onkeyup=e=>{
+  if(e.key=='ArrowLeft')k.l=0;
+  if(e.key=='ArrowRight')k.r=0;
+};
 
-  const cx=Math.floor((player.x+8)/TILE),
-        cy=Math.floor((player.y+8)/TILE);
-  if(map[cy]?.[cx]==2) win();
-  if(player.y>canvas.height) lose();
+function loop(){
+  p.vy+=0.45;
+  if(!col(p.x,p.y+p.vy)){p.y+=p.vy;p.on=false}else{p.vy=0;p.on=true}
+  p.vx=(k.r-k.l)*2.5;
+  if(!col(p.x+p.vx,p.y))p.x+=p.vx;
+  draw();
+  requestAnimationFrame(loop);
 }
 
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-    if(map[y][x]==1){ctx.fillStyle='#4caf50';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
-    if(map[y][x]==2){ctx.fillStyle='#e53935';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
-  }
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.save();
+  ctx.translate(c.width/2-p.x,c.height/2-p.y);
+
+  for(let y=0;y<map.length;y++)
+    for(let x=0;x<map[0].length;x++){
+      if(map[y][x]==1){ctx.fillStyle='#4caf50';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
+      if(map[y][x]==2){ctx.fillStyle='#e53935';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
+    }
+
   ctx.fillStyle='#ff0';
-  ctx.fillRect(player.x,player.y,player.w,player.h);
+  ctx.fillRect(p.x,p.y,16,16);
+  ctx.restore();
 }
 
-function loop(){update();draw();requestAnimationFrame(loop)}
 loop();
-
-onkeydown=e=>{
-  if(e.key==='ArrowLeft') keys.l=true;
-  if(e.key==='ArrowRight') keys.r=true;
-  if((e.key==='ArrowUp'||e.key===' ')&&player.onGround) player.vy=-8;
-};
-onkeyup=e=>{
-  if(e.key==='ArrowLeft') keys.l=false;
-  if(e.key==='ArrowRight') keys.r=false;
-};
-
-function win(){document.getElementById('win').style.display='flex'}
-function lose(){document.getElementById('lose').style.display='flex'}
-function restart(){location.reload()}
-function voltar(){location.href='editor.html'}
