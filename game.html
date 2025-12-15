@@ -2,37 +2,53 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>CatTroll Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-body{margin:0;background:#000;overflow:hidden}
-canvas{display:block;margin:auto;background:#000}
-.overlay{
-  position:absolute;inset:0;
-  background:rgba(0,0,0,.7);
-  color:#fff;display:flex;
-  flex-direction:column;
-  align-items:center;
+body{
+  margin:0;
+  background:#000;
+  display:flex;
   justify-content:center;
-  gap:12px;
+  align-items:center;
+  height:100vh;
 }
-button{padding:8px 14px;border:none;border-radius:8px;background:#333;color:#fff}
+
+canvas{
+  background:#000;
+  border:2px solid #333;
+}
+
+#overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.8);
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  gap:12px;
+  color:#fff;
+}
+button{
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#2196f3;
+  color:#fff;
+  font-weight:bold;
+}
 </style>
 </head>
+
 <body>
 
-<canvas id="canvas" width="360" height="480"></canvas>
+<canvas id="c" width="360" height="480"></canvas>
 
-<div id="win" class="overlay" style="display:none">
-  <h2>🎉 Vitória</h2>
-  <button onclick="restart()">Rejogar</button>
-  <button onclick="voltar()">Editor</button>
-</div>
-
-<div id="lose" class="overlay" style="display:none">
-  <h2>💀 Morreu</h2>
-  <button onclick="restart()">Rejogar</button>
-  <button onclick="voltar()">Editor</button>
+<div id="overlay" hidden>
+  <h2 id="msg"></h2>
+  <button onclick="location.href='editor.html'">Editor</button>
 </div>
 
 <script src="game.js"></script>
