@@ -1,38 +1,40 @@
-const TILE = 16;
-const BASE_COLS = 80, BASE_ROWS = 60;
-
-let map = Array.from({length: BASE_ROWS}, () => Array(BASE_COLS).fill(0));
-
-let estado = 'editor';
-let keys = {l: false, r: false};
-let joyX = 0;
-
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const player = {x:0, y:0, w:16, h:16, vx:0, vy:0, onGround:false};
+
+const TILE = 16;
+const BASE_COLS = 80;
+const BASE_ROWS = 60;
+
+let map = []; // será preenchido com window.gameMap
+const player = { x: 0, y: 0, w: 16, h: 16, vx: 0, vy: 0, onGround: false };
 const gravity = 0.45;
+let estado = 'editor';
+let keys = { l: false, r: false };
+let joyX = 0;
 
 const win = document.getElementById('overlayWin');
 const lose = document.getElementById('overlayLose');
 const joystick = document.getElementById('joystick');
 const jumpBtn = document.getElementById('jumpBtn');
 
-/* ===== FUNÇÕES DO MAPA ===== */
+let cam = { x: 0, y: 0, zoom: 1 };
+
+// ===== FUNÇÕES AUXILIARES =====
 function achar(v){
-  for(let y=0;y<BASE_ROWS;y++)
-    for(let x=0;x<BASE_COLS;x++)
-      if(map[y][x]===v) return {x,y};
+  for(let y = 0; y < BASE_ROWS; y++)
+    for(let x = 0; x < BASE_COLS; x++)
+      if(map[y][x] === v) return { x, y };
 }
 
-function solid(x,y){ return map[y]?.[x] == 1; }
+function solid(x, y){ return map[y]?.[x] === 1; }
 
-function colisao(nx,ny){
-  const l=Math.floor(nx/TILE), r=Math.floor((nx+15)/TILE),
-        t=Math.floor(ny/TILE), b=Math.floor((ny+15)/TILE);
-  return solid(l,t)||solid(r,t)||solid(l,b)||solid(r,b);
+function colisao(nx, ny){
+  const l = Math.floor(nx / TILE), r = Math.floor((nx + player.w - 1) / TILE),
+        t = Math.floor(ny / TILE), b = Math.floor((ny + player.h - 1) / TILE);
+  return solid(l, t) || solid(r, t) || solid(l, b) || solid(r, b);
 }
 
-/* ===== UPDATE ===== */
+// ===== UPDATE =====
 function update(){
   if(estado !== 'jogo') return;
 
@@ -51,56 +53,52 @@ function update(){
   player.vx = Math.max(-1, Math.min(1, player.vx)) * 2.6;
   if(!colisao(player.x + player.vx, player.y)) player.x += player.vx;
 
-  // Checa morte
-  if(player.y > canvas.height){ 
+  // Limite inferior
+  if(player.y > canvas.height){
     estado = 'lose';
     lose.style.display = 'flex';
   }
 
-  // Checa vitória
-  const cx = Math.floor((player.x+8)/TILE);
-  const cy = Math.floor((player.y+8)/TILE);
-  if(map[cy]?.[cx] == 2){
+  // Vitória
+  const cx = Math.floor((player.x + player.w/2) / TILE);
+  const cy = Math.floor((player.y + player.h/2) / TILE);
+  if(map[cy]?.[cx] === 2){
     estado = 'win';
     win.style.display = 'flex';
   }
+
+  // Atualiza câmera para centralizar no player
+  cam.x = player.x + player.w/2 - canvas.width/2;
+  cam.y = player.y + player.h/2 - canvas.height/2;
 }
 
-/* ===== DRAW COM CÂMERA CENTRALIZADA ===== */
+// ===== DRAW =====
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // Calcula deslocamento da câmera para centralizar player
-  const camX = player.x - canvas.width/2 + player.w/2;
-  const camY = player.y - canvas.height/2 + player.h/2;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
-  ctx.translate(-camX, -camY);
+  ctx.translate(-cam.x, -cam.y);
 
-  // Desenha mapa
-  for(let y=0; y<BASE_ROWS; y++){
-    for(let x=0; x<BASE_COLS; x++){
-      if(map[y][x] == 1){ ctx.fillStyle = '#4caf50'; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
-      if(map[y][x] == 2){ ctx.fillStyle = '#e53935'; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
-      if(map[y][x] == 3){ ctx.fillStyle = '#ffca28'; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
+  for(let y = 0; y < BASE_ROWS; y++)
+    for(let x = 0; x < BASE_COLS; x++){
+      if(map[y][x] === 1){ ctx.fillStyle = '#4caf50'; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
+      if(map[y][x] === 2){ ctx.fillStyle = '#e53935'; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
+      if(map[y][x] === 3){ ctx.fillStyle = '#ffca28'; ctx.fillRect(x*TILE, y*TILE, TILE, TILE); }
     }
-  }
 
-  // Desenha player
+  // Player
   ctx.fillStyle = '#ff0';
   ctx.fillRect(player.x, player.y, player.w, player.h);
 
   ctx.restore();
 }
 
-/* ===== LOOP ===== */
-function loop(){
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
 
-/* ===== MOSTRAR / ESCONDER TELAS ===== */
+// ===== MOSTRAR JOGO =====
 function mostrarJogo(){
+  if(!window.gameMap) return alert('Mapa do editor não encontrado');
+  map = window.gameMap.map(row => row.slice());
+
   const s = achar(3), g = achar(2);
   if(!s || !g) return alert('Spawn e Chegada obrigatórios');
 
@@ -111,8 +109,9 @@ function mostrarJogo(){
 
   player.x = s.x * TILE;
   player.y = s.y * TILE - 1;
-  player.vy = 0;
   player.vx = 0;
+  player.vy = 0;
+  player.onGround = false;
 
   estado = 'jogo';
   loop();
@@ -125,7 +124,7 @@ function mostrarEditor(){
   joystick.style.display = jumpBtn.style.display = 'none';
 }
 
-/* ===== CONTROLES TECLADO ===== */
+// ===== CONTROLES =====
 onkeydown = e => {
   if(e.key === 'ArrowLeft') keys.l = true;
   if(e.key === 'ArrowRight') keys.r = true;
@@ -137,13 +136,12 @@ onkeyup = e => {
   if(e.key === 'ArrowRight') keys.r = false;
 };
 
-/* ===== JOYSTICK ===== */
+// Joystick
 joystick.addEventListener('touchmove', e => {
   const r = joystick.getBoundingClientRect();
-  joyX = Math.max(-1, Math.min(1, (e.touches[0].clientX - (r.left+60)) / 40));
+  joyX = Math.max(-1, Math.min(1, (e.touches[0].clientX - (r.left + 60)) / 40));
 });
-
 joystick.addEventListener('touchend', () => joyX = 0);
 
-/* ===== JUMP BUTTON ===== */
+// Botão pular
 jumpBtn.ontouchstart = () => { if(player.onGround) player.vy = -8; };
