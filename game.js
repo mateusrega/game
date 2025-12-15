@@ -1,63 +1,84 @@
 const TILE=16;
-const map=JSON.parse(localStorage.getItem('cattroll_map'));
-if(!map){location.href='editor.html'}
+const BASE_COLS=80, BASE_ROWS=60;
+let map=Array.from({length:BASE_ROWS},()=>Array(BASE_COLS).fill(0));
 
-const c=document.getElementById('c');
-const ctx=c.getContext('2d');
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const player={x:0,y:0,w:16,h:16,vx:0,vy:0,onGround:false};
+const gravity=0.45;
+let estado='jogo', keys={l:false,r:false}, joyX=0;
+const win=document.getElementById('overlayWin');
+const lose=document.getElementById('overlayLose');
 
-let p={x:0,y:0,vx:0,vy:0,on:false};
-
-function find(v){
-  for(let y=0;y<map.length;y++)
-    for(let x=0;x<map[0].length;x++)
-      if(map[y][x]==v) return{x,y};
+/* ===== FUNCÕES AUX ===== */
+function achar(v){
+  for(let y=0;y<BASE_ROWS;y++)
+    for(let x=0;x<BASE_COLS;x++)
+      if(map[y][x]===v) return{x,y};
 }
-
-const s=find(3);
-p.x=s.x*TILE;
-p.y=s.y*TILE;
-
 function solid(x,y){return map[y]?.[x]==1}
-function col(nx,ny){
-  const l=nx>>4,r=(nx+15)>>4,t=ny>>4,b=(ny+15)>>4;
+function colisao(nx,ny){
+  const l=Math.floor(nx/TILE),r=Math.floor((nx+15)/TILE),
+        t=Math.floor(ny/TILE),b=Math.floor((ny+15)/TILE);
   return solid(l,t)||solid(r,t)||solid(l,b)||solid(r,b);
 }
 
-let k={l:0,r:0};
+/* ===== UPDATE ===== */
+function update(){
+  if(estado!=='jogo') return;
+  player.vy+=gravity;
+  if(!colisao(player.x,player.y+player.vy)){
+    player.y+=player.vy; player.onGround=false;
+  }else{
+    player.vy=0; player.onGround=true;
+  }
+  player.vx=(keys.l?-1:0)+(keys.r?1:0)+joyX;
+  player.vx=Math.max(-1,Math.min(1,player.vx))*2.6;
+  if(!colisao(player.x+player.vx,player.y)) player.x+=player.vx;
+  if(player.y>canvas.height){estado='lose';lose.style.display='flex'}
+  const cx=Math.floor((player.x+8)/TILE),
+        cy=Math.floor((player.y+8)/TILE);
+  if(map[cy]?.[cx]==2){estado='win';win.style.display='flex'}
+}
+
+/* ===== DRAW ===== */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let y=0;y<BASE_ROWS;y++)for(let x=0;x<BASE_COLS;x++){
+    if(map[y][x]==1){ctx.fillStyle='#4caf50';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
+    if(map[y][x]==2){ctx.fillStyle='#e53935';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
+  }
+  ctx.fillStyle='#ff0';
+  ctx.fillRect(player.x,player.y,player.w,player.h);
+}
+
+function loop(){update();draw();requestAnimationFrame(loop)}
+
+/* ===== INTERAÇÕES ===== */
+function mostrarJogo(){
+  estado='jogo';
+  loop();
+}
+function mostrarEditor(){
+  window.location.href='editor.html';
+}
 
 onkeydown=e=>{
-  if(e.key=='ArrowLeft')k.l=1;
-  if(e.key=='ArrowRight')k.r=1;
-  if(e.key=='ArrowUp'&&p.on)p.vy=-8;
+  if(e.key==='ArrowLeft') keys.l=true;
+  if(e.key==='ArrowRight') keys.r=true;
+  if((e.key==='ArrowUp'||e.key===' ')&&player.onGround) player.vy=-8;
 };
 onkeyup=e=>{
-  if(e.key=='ArrowLeft')k.l=0;
-  if(e.key=='ArrowRight')k.r=0;
+  if(e.key==='ArrowLeft') keys.l=false;
+  if(e.key==='ArrowRight') keys.r=false;
 };
 
-function loop(){
-  p.vy+=0.45;
-  if(!col(p.x,p.y+p.vy)){p.y+=p.vy;p.on=false}else{p.vy=0;p.on=true}
-  p.vx=(k.r-k.l)*2.5;
-  if(!col(p.x+p.vx,p.y))p.x+=p.vx;
-  draw();
-  requestAnimationFrame(loop);
-}
+const joystick=document.getElementById('joystick');
+joystick.addEventListener('touchmove',e=>{
+  const r=joystick.getBoundingClientRect();
+  joyX=Math.max(-1,Math.min(1,(e.touches[0].clientX-(r.left+60))/40));
+});
+joystick.addEventListener('touchend',()=>joyX=0);
 
-function draw(){
-  ctx.clearRect(0,0,c.width,c.height);
-  ctx.save();
-  ctx.translate(c.width/2-p.x,c.height/2-p.y);
-
-  for(let y=0;y<map.length;y++)
-    for(let x=0;x<map[0].length;x++){
-      if(map[y][x]==1){ctx.fillStyle='#4caf50';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
-      if(map[y][x]==2){ctx.fillStyle='#e53935';ctx.fillRect(x*TILE,y*TILE,TILE,TILE)}
-    }
-
-  ctx.fillStyle='#ff0';
-  ctx.fillRect(p.x,p.y,16,16);
-  ctx.restore();
-}
-
-loop();
+const jumpBtn=document.getElementById('jumpBtn');
+jumpBtn.ontouchstart=()=>{if(player.onGround)player.vy=-8};
