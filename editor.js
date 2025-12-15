@@ -1,51 +1,105 @@
-const TILE=16, COLS=80, ROWS=60;
-let map=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-let modo=1, pintando=false;
-
+const TILE=16;
+const BASE_COLS=80, BASE_ROWS=60;
+let map=Array.from({length:BASE_ROWS},()=>Array(BASE_COLS).fill(0));
+let modo='plataforma', pintando=false;
+let cam={x:0,y:0,zoom:1};
 const grid=document.getElementById('grid');
-grid.style.gridTemplateColumns=`repeat(${COLS},${TILE}px)`;
+const wrap=document.getElementById('gridWrap');
+
+/* ===== RENDER CONTROL ===== */
+let needsRender=false;
+function requestRender(){
+  if(needsRender) return;
+  needsRender=true;
+  requestAnimationFrame(()=>{
+    render();
+    needsRender=false;
+  });
+}
+
+/* ===== UNDO / REDO ===== */
+let hist=[], redoStack=[];
+function snapshot(){
+  hist.push(JSON.stringify(map));
+  if(hist.length>50) hist.shift();
+  redoStack=[];
+}
+function undo(){
+  if(!hist.length) return;
+  redoStack.push(JSON.stringify(map));
+  map=JSON.parse(hist.pop());
+  requestRender();
+}
+function redo(){
+  if(!redoStack.length) return;
+  hist.push(JSON.stringify(map));
+  map=JSON.parse(redoStack.pop());
+  requestRender();
+}
+
+function setModo(m){modo=m}
+
+function limpar(v){
+  for(let y=0;y<BASE_ROWS;y++)
+    for(let x=0;x<BASE_COLS;x++)
+      if(map[y][x]===v) map[y][x]=0;
+}
+
+function pintar(x,y){
+  if(modo==='plataforma') map[y][x]=1;
+  if(modo==='spawn'){ limpar(3); map[y][x]=3; }
+  if(modo==='goal'){ limpar(2); map[y][x]=2; }
+  if(modo==='delete') map[y][x]=0;
+}
 
 function render(){
+  grid.style.transform=`translate(${-cam.x}px,${-cam.y}px) scale(${cam.zoom})`;
+  grid.style.gridTemplateColumns=`repeat(${BASE_COLS},${TILE}px)`;
   grid.innerHTML='';
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+  for(let y=0;y<BASE_ROWS;y++)for(let x=0;x<BASE_COLS;x++){
     const d=document.createElement('div');
     d.className='tile';
-    if(map[y][x]==1)d.classList.add('p');
-    if(map[y][x]==2)d.classList.add('g');
-    if(map[y][x]==3)d.classList.add('s');
+    if(map[y][x]==1) d.classList.add('platform');
+    if(map[y][x]==2) d.classList.add('goal');
+    if(map[y][x]==3) d.classList.add('spawn');
 
-    d.onmousedown=()=>{pintando=true;pintar(x,y)};
-    d.onmouseenter=()=>{if(pintando)pintar(x,y)};
-
+    d.onmousedown=()=>{
+      snapshot();
+      pintando=true;
+      pintar(x,y);
+      requestRender();
+    };
+    d.onmouseenter=()=>{
+      if(pintando){
+        pintar(x,y);
+        requestRender();
+      }
+    };
     grid.appendChild(d);
   }
 }
-document.onmouseup=()=>pintando=false;
+render();
 
-function pintar(x,y){
-  if(modo==3) limpar(3);
-  if(modo==2) limpar(2);
-  map[y][x]=modo;
-  render();
-}
+onmouseup=()=>pintando=false;
 
-function limpar(v){
-  for(let y=0;y<ROWS;y++)
-    for(let x=0;x<COLS;x++)
-      if(map[y][x]==v) map[y][x]=0;
-}
-
-document.querySelectorAll('[data-m]').forEach(b=>{
-  b.onclick=()=>{
-    document.querySelectorAll('[data-m]').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active');
-    modo=+b.dataset.m;
-  };
-});
-
-document.getElementById('testar').onclick=()=>{
-  localStorage.setItem('cattroll_map',JSON.stringify(map));
-  location.href='game.html';
+/* ===== PAN + ZOOM ===== */
+let dragging=false, lx=0, ly=0;
+wrap.onmousedown=e=>{dragging=true;lx=e.clientX;ly=e.clientY};
+onmouseup=()=>dragging=false;
+onmousemove=e=>{
+  if(dragging){
+    cam.x-=e.clientX-lx;
+    cam.y-=e.clientY-ly;
+    lx=e.clientX; ly=e.clientY;
+    requestRender();
+  }
+};
+wrap.onwheel=e=>{
+  cam.zoom=Math.max(0.5,Math.min(2,cam.zoom+(e.deltaY*-0.001)));
+  requestRender();
 };
 
-render();
+/* ===== TESTAR JOGO ===== */
+function mostrarJogo(){
+  window.location.href='game.html';
+}
