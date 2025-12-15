@@ -1,0 +1,7 @@
+{
+  "cleanUrls": false,
+  "routes": [
+    { "src": "/editor.html", "dest": "/editor.html" },
+    { "src": "/game.html", "dest": "/game.html" }
+  ]
+}
